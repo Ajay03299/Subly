@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcryptjs from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  saveRefreshToken,
+} from '@/lib/jwt';
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,13 +41,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Return user data (without password)
+    // Generate JWT tokens
+    const payload = {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+    };
+
+    const accessToken = generateAccessToken(payload);
+    const refreshToken = generateRefreshToken(payload);
+
+    // Save refresh token to database
+    await saveRefreshToken(user.id, refreshToken);
+
+    // Return user data (without password) and tokens
     const { password: _, ...userWithoutPassword } = user;
 
     return NextResponse.json(
       {
         message: 'Login successful',
         user: userWithoutPassword,
+        accessToken,
+        refreshToken,
       },
       { status: 200 }
     );

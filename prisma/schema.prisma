@@ -77,13 +77,26 @@ model User {
   verifiedAt DateTime?
   role       Role      @default(USER)
 
-  subscriptions Subscription[]
-  payments      Payment[]
+  subscriptions  Subscription[]
+  payments       Payment[]
+  refreshTokens  RefreshToken[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
 }
 
 // ─────────────────────────────────────────────────────────
@@ -171,8 +184,6 @@ model Subscription {
   recurringPlanId String?
   recurringPlan   RecurringPlan? @relation(fields: [recurringPlanId], references: [id])
 
-  startDate    DateTime
-  endDate      DateTime?
   paymentTerms String? // e.g. "Net 30", "Due on Receipt"
 
   status SubscriptionStatus @default(DRAFT)

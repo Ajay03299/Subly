@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   User,
   Mail,
@@ -25,19 +25,17 @@ import {
 } from "@/components/ui/card";
 
 /* ------------------------------------------------------------------ */
-/*  Mock user — replace with real session / API later                 */
+/*  Types                                                             */
 /* ------------------------------------------------------------------ */
 
-const MOCK_USER = {
-  name: "Arjun Sai",
-  email: "arjun@example.com",
-  phone: "+91 98765 43210",
-  address: "123 Tech Park, Bangalore, India",
-  role: "Portal User" as const,
-  memberSince: "January 2025",
-  activeSubscriptions: 2,
-  totalSpent: "₹24,800",
-};
+interface UserData {
+  id: string;
+  email: string;
+  role: string;
+  verifiedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Profile page                                                      */
@@ -45,17 +43,126 @@ const MOCK_USER = {
 
 export default function ProfilePage() {
   const [editing, setEditing] = useState(false);
-  const [user, setUser] = useState(MOCK_USER);
-  const [form, setForm] = useState(MOCK_USER);
+  const [user, setUser] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
-  const handleSave = () => {
-    setUser(form);
-    setEditing(false);
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      setLoading(true);
+      const accessToken = localStorage.getItem("accessToken");
+
+      if (!accessToken) {
+        setError("Not authenticated. Please login.");
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch("/api/auth/me", {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch user profile");
+      }
+
+      const data = await response.json();
+      setUser(data.user);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load profile");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleCancel = () => {
-    setForm(user);
-    setEditing(false);
+  const handlePasswordChange = async () => {
+    if (newPassword !== confirmPassword) {
+      alert("Passwords do not match!");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: user?.email,
+          newPassword,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to reset password");
+      }
+
+      alert("Password changed successfully!");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to change password");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-lg">Loading...</p>
+      </div>
+    );
+  }
+
+  if (error || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Error</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-red-500">{error || "User not found"}</p>
+            <Button
+              className="mt-4"
+              onClick={() => (window.location.href = "/login")}
+            >
+              Go to Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case "ADMIN":
+        return "Administrator";
+      case "INTERNAL_USER":
+        return "Internal User";
+      case "USER":
+        return "Portal User";
+      default:
+        return role;
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+    });
   };
 
   return (
@@ -68,28 +175,6 @@ export default function ProfilePage() {
             Manage your account details and preferences
           </p>
         </div>
-
-        {!editing ? (
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() => setEditing(true)}
-          >
-            <Edit3 className="h-4 w-4" />
-            Edit Profile
-          </Button>
-        ) : (
-          <div className="flex gap-2">
-            <Button variant="outline" className="gap-2" onClick={handleCancel}>
-              <X className="h-4 w-4" />
-              Cancel
-            </Button>
-            <Button className="gap-2" onClick={handleSave}>
-              <Save className="h-4 w-4" />
-              Save Changes
-            </Button>
-          </div>
-        )}
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
@@ -97,18 +182,18 @@ export default function ProfilePage() {
         <Card className="md:col-span-1">
           <CardContent className="flex flex-col items-center gap-4 pt-8">
             <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-accent/30 text-3xl font-bold text-primary">
-              {user.name
-                .split(" ")
-                .map((n) => n[0])
-                .join("")}
+              {user.email
+                .split("@")[0]
+                .substring(0, 2)
+                .toUpperCase()}
             </div>
             <div className="text-center">
-              <h2 className="text-lg font-semibold">{user.name}</h2>
+              <h2 className="text-lg font-semibold">{user.email.split("@")[0]}</h2>
               <p className="text-sm text-muted-foreground">{user.email}</p>
             </div>
             <Badge variant="secondary" className="gap-1">
               <Shield className="h-3 w-3" />
-              {user.role}
+              {getRoleLabel(user.role)}
             </Badge>
           </CardContent>
         </Card>
@@ -122,71 +207,37 @@ export default function ProfilePage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            {/* Name */}
-            <div className="space-y-1.5">
-              <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <User className="h-4 w-4" />
-                Full Name
-              </label>
-              {editing ? (
-                <Input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                />
-              ) : (
-                <p className="text-sm">{user.name}</p>
-              )}
-            </div>
-
             {/* Email */}
             <div className="space-y-1.5">
               <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                 <Mail className="h-4 w-4" />
                 Email Address
               </label>
-              {editing ? (
-                <Input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                />
-              ) : (
-                <p className="text-sm">{user.email}</p>
-              )}
+              <p className="text-sm">{user.email}</p>
             </div>
 
-            {/* Phone */}
+            {/* Role */}
             <div className="space-y-1.5">
               <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <Phone className="h-4 w-4" />
-                Phone
+                <Shield className="h-4 w-4" />
+                Account Role
               </label>
-              {editing ? (
-                <Input
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                />
-              ) : (
-                <p className="text-sm">{user.phone}</p>
-              )}
+              <p className="text-sm">{getRoleLabel(user.role)}</p>
             </div>
 
-            {/* Address */}
+            {/* Verified Status */}
             <div className="space-y-1.5">
               <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <MapPin className="h-4 w-4" />
-                Address
+                <User className="h-4 w-4" />
+                Verification Status
               </label>
-              {editing ? (
-                <Input
-                  value={form.address}
-                  onChange={(e) =>
-                    setForm({ ...form, address: e.target.value })
-                  }
-                />
-              ) : (
-                <p className="text-sm">{user.address}</p>
-              )}
+              <p className="text-sm">
+                {user.verifiedAt ? (
+                  <Badge variant="default">Verified</Badge>
+                ) : (
+                  <Badge variant="secondary">Not Verified</Badge>
+                )}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -199,7 +250,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Member Since</p>
-              <p className="font-semibold">{user.memberSince}</p>
+              <p className="font-semibold">{formatDate(user.createdAt)}</p>
             </div>
           </CardContent>
         </Card>
@@ -211,9 +262,9 @@ export default function ProfilePage() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">
-                Active Subscriptions
+                Account Status
               </p>
-              <p className="font-semibold">{user.activeSubscriptions}</p>
+              <p className="font-semibold">Active</p>
             </div>
           </CardContent>
         </Card>
@@ -221,11 +272,11 @@ export default function ProfilePage() {
         <Card>
           <CardContent className="flex items-center gap-4 pt-6">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-chart-4/10">
-              <CreditCard className="h-5 w-5 text-chart-4" />
+              <User className="h-5 w-5 text-chart-4" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Total Spent</p>
-              <p className="font-semibold">{user.totalSpent}</p>
+              <p className="text-sm text-muted-foreground">User ID</p>
+              <p className="font-semibold text-xs">{user.id.substring(0, 12)}...</p>
             </div>
           </CardContent>
         </Card>
@@ -243,22 +294,41 @@ export default function ProfilePage() {
               <label className="text-sm font-medium text-muted-foreground">
                 Current Password
               </label>
-              <Input type="password" placeholder="••••••••" />
+              <Input
+                type="password"
+                placeholder="••••••••"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+              />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-muted-foreground">
                 New Password
               </label>
-              <Input type="password" placeholder="••••••••" />
+              <Input
+                type="password"
+                placeholder="••••••••"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-muted-foreground">
                 Confirm Password
               </label>
-              <Input type="password" placeholder="••••••••" />
+              <Input
+                type="password"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
             </div>
           </div>
-          <Button variant="outline" className="mt-4">
+          <Button
+            variant="outline"
+            className="mt-4"
+            onClick={handlePasswordChange}
+          >
             Change Password
           </Button>
         </CardContent>

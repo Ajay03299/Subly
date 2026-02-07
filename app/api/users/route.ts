@@ -5,7 +5,7 @@ import type { Role } from "@/lib/types/users";
 
 // List users: ADMIN + INTERNAL allowed
 export async function GET() {
-  const role = getCurrentRole();
+  const role = await getCurrentRole();
   if (role !== "ADMIN" && role !== "INTERNAL") {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
@@ -14,7 +14,7 @@ export async function GET() {
 
 // Create user: only ADMIN can create, and only ADMIN can create INTERNAL users (spec rule)
 export async function POST(req: NextRequest) {
-  const role = getCurrentRole();
+  const role = await getCurrentRole();
   if (role !== "ADMIN") {
     return NextResponse.json({ error: "only admin can create users" }, { status: 403 });
   }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyAccessToken } from "@/lib/jwt";
 
-async function verifyAuth(request: NextRequest) {
+async function verifyAdmin(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   if (!authHeader?.startsWith("Bearer ")) {
     return { error: "No token provided", status: 401 };
@@ -17,11 +17,11 @@ async function verifyAuth(request: NextRequest) {
   }
 
   const user = await prisma.user.findUnique({ where: { id: payload.userId } });
-  if (!user) {
-    return { error: "User not found", status: 404 };
+  if (!user || user.role !== "ADMIN") {
+    return { error: "Only admins can manage taxes", status: 403 };
   }
 
-  return { userId: user.id, role: user.role };
+  return { userId: user.id };
 }
 
 /* ------------------------------------------------------------------ */
@@ -29,7 +29,7 @@ async function verifyAuth(request: NextRequest) {
 /* ------------------------------------------------------------------ */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await verifyAuth(request);
+    const auth = await verifyAdmin(request);
     if ("error" in auth) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -53,16 +53,9 @@ export async function GET(request: NextRequest) {
 /* ------------------------------------------------------------------ */
 export async function POST(request: NextRequest) {
   try {
-    const auth = await verifyAuth(request);
+    const auth = await verifyAdmin(request);
     if ("error" in auth) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
-    }
-
-    if (auth.role !== "ADMIN") {
-      return NextResponse.json(
-        { error: "Only admins can create taxes" },
-        { status: 403 }
-      );
     }
 
     const { name, rate, isDefault } = await request.json();
@@ -74,18 +67,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // If setting as default, unset others
+    if (isDefault === true) {
+      await prisma.tax.updateMany({
+        where: { isDefault: true },
+        data: { isDefault: false },
+      });
+    }
+
     const tax = await prisma.tax.create({
       data: {
-        name,
-        rate: parseFloat(rate),
-        isDefault: isDefault ?? false,
+        name: String(name).trim(),
+        rate: Number(rate),
+        isDefault: Boolean(isDefault) || false,
       },
     });
 
-    return NextResponse.json(
-      { message: "Tax created", tax },
-      { status: 201 }
-    );
+    return NextResponse.json({ tax }, { status: 201 });
   } catch (error) {
     console.error("Create tax error:", error);
     return NextResponse.json(

@@ -48,7 +48,7 @@ export interface Product {
   images?: string[] | { id: string; url: string; alt: string | null }[];
   recurringPlan?: RecurringPlanInfo | null;
   recurringPlans?: RecurringPlanInfo[];
-  taxRate: number; // percentage, e.g. 15
+  tax?: { id: string; name: string; rate: number } | null;
 }
 
 export interface CartItem {
@@ -63,25 +63,19 @@ interface CartCtx {
   addItem: (item: CartItem) => void;
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, qty: number) => void;
+  refreshItemTaxes: () => Promise<void>;
   clearCart: () => void;
   itemCount: number;
   subtotal: number;
-  taxRate: number;
+  taxBreakdown: Array<{ name: string; rate: number; amount: number }>;
   taxAmount: number;
   total: number;
   discountCode: string;
   setDiscountCode: (c: string) => void;
   discountApplied: boolean;
-  applyDiscount: () => void;
+  applyDiscount: () => Promise<void>;
   discountAmount: number;
 }
-
-const DEFAULT_TAX_RATE = 0.15; // 15%
-const DISCOUNT_CODES: Record<string, number> = {
-  SAVE10: 0.1,
-  WELCOME20: 0.2,
-};
-
 /* ------------------------------------------------------------------ */
 /*  Context                                                           */
 /* ------------------------------------------------------------------ */
@@ -92,7 +86,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [discountCode, setDiscountCode] = useState("");
   const [discountApplied, setDiscountApplied] = useState(false);
-  const [discountPct, setDiscountPct] = useState(0);
+  const [discountType, setDiscountType] = useState<"FIXED" | "PERCENTAGE" | null>(null);
+  const [discountValue, setDiscountValue] = useState(0);
 
   const addItem = useCallback((item: CartItem) => {
     setItems((prev) => {
@@ -129,20 +124,103 @@ export function CartProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
+  const refreshItemTaxes = useCallback(async () => {
+    const missingTaxIds = items
+      .filter((i) => !i.product.tax)
+      .map((i) => i.product.id);
+
+    if (missingTaxIds.length === 0) return;
+
+    try {
+      const [defaultTaxRes, ...productResults] = await Promise.all([
+        fetch("/api/portal/tax/default"),
+        ...missingTaxIds.map((id) => fetch(`/api/products/${id}`)),
+      ]);
+
+      const defaultTaxData = defaultTaxRes.ok ? await defaultTaxRes.json() : null;
+      const defaultTax = defaultTaxData?.tax || null;
+
+      const products = await Promise.all(
+        productResults.map(async (res) => {
+          if (!res.ok) return null;
+          const data = await res.json();
+          return data.product || null;
+        })
+      );
+
+      setItems((prev) =>
+        prev.map((item) => {
+          const updated = products.find((p) => p?.id === item.product.id);
+          const tax = updated?.tax || defaultTax || null;
+          if (!tax) return item;
+          return {
+            ...item,
+            product: {
+              ...item.product,
+              tax,
+            },
+          };
+        })
+      );
+    } catch {
+      // Silent fail
+    }
+  }, [items]);
+
   const clearCart = useCallback(() => {
     setItems([]);
     setDiscountApplied(false);
-    setDiscountPct(0);
+    setDiscountType(null);
+    setDiscountValue(0);
     setDiscountCode("");
   }, []);
 
-  const applyDiscount = useCallback(() => {
-    const pct = DISCOUNT_CODES[discountCode.toUpperCase()];
-    if (pct) {
-      setDiscountPct(pct);
+  const applyDiscount = useCallback(async () => {
+    const code = discountCode.trim();
+    if (!code) return;
+
+    try {
+      const quantity = items.reduce((s, i) => s + i.quantity, 0);
+      const subtotalValue = items.reduce((s, i) => {
+        const base =
+          typeof i.plan === "string"
+            ? i.plan === "Monthly"
+              ? (i.product.monthlyPrice ?? Number(i.product.salesPrice) ?? 0)
+              : (i.product.yearlyPrice ?? Number(i.product.salesPrice) ?? 0)
+            : Number(i.plan?.price) || Number(i.product.salesPrice) || 0;
+        const extra = i.selectedVariant?.extraPrice ?? 0;
+        return s + (base + extra) * i.quantity;
+      }, 0);
+
+      const res = await fetch("/api/portal/discounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code,
+          subtotal: subtotalValue,
+          quantity,
+        }),
+      });
+
+      if (!res.ok) {
+        setDiscountApplied(false);
+        setDiscountType(null);
+        setDiscountValue(0);
+        return;
+      }
+
+      const data = await res.json();
+      const discount = data.discount;
+
+      setDiscountType(discount.type);
+      setDiscountValue(Number(discount.value));
       setDiscountApplied(true);
+    } catch {
+      setDiscountApplied(false);
+      setDiscountType(null);
+      setDiscountValue(0);
     }
-  }, [discountCode]);
+  }, [discountCode, items]);
 
   const itemCount = items.reduce((s, i) => s + i.quantity, 0);
 
@@ -157,9 +235,44 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return s + (base + extra) * i.quantity;
   }, 0);
 
-  const discountAmount = discountApplied ? subtotal * discountPct : 0;
+  const rawDiscountAmount =
+    discountApplied && discountType
+      ? discountType === "PERCENTAGE"
+        ? subtotal * (discountValue / 100)
+        : discountValue
+      : 0;
+  const discountAmount = Math.min(rawDiscountAmount, subtotal);
   const afterDiscount = subtotal - discountAmount;
-  const taxAmount = afterDiscount * DEFAULT_TAX_RATE;
+  const taxRatio = subtotal > 0 ? afterDiscount / subtotal : 1;
+
+  const taxMap = new Map<string, { name: string; rate: number; amount: number }>();
+  items.forEach((item) => {
+    const base =
+      typeof item.plan === "string"
+        ? item.plan === "Monthly"
+          ? (item.product.monthlyPrice ?? Number(item.product.salesPrice) ?? 0)
+          : (item.product.yearlyPrice ?? Number(item.product.salesPrice) ?? 0)
+        : Number(item.plan?.price) || Number(item.product.salesPrice) || 0;
+    const extra = item.selectedVariant?.extraPrice ?? 0;
+    const lineSubtotal = (base + extra) * item.quantity;
+    const rate = Number(item.product.tax?.rate ?? 0);
+    if (rate <= 0) return;
+    const baseTax = lineSubtotal * (rate / 100);
+    const name = item.product.tax?.name || `Tax (${rate.toFixed(0)}%)`;
+    const key = item.product.tax?.id || `rate-${rate}`;
+    const existing = taxMap.get(key);
+    if (existing) {
+      existing.amount += baseTax;
+    } else {
+      taxMap.set(key, { name, rate, amount: baseTax });
+    }
+  });
+
+  const taxBreakdown = Array.from(taxMap.values()).map((t) => ({
+    ...t,
+    amount: t.amount * taxRatio,
+  }));
+  const taxAmount = taxBreakdown.reduce((s, t) => s + t.amount, 0);
   const total = afterDiscount + taxAmount;
 
   return (
@@ -169,10 +282,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
         addItem,
         removeItem,
         updateQuantity,
+        refreshItemTaxes,
         clearCart,
         itemCount,
         subtotal,
-        taxRate: DEFAULT_TAX_RATE,
+        taxBreakdown,
         taxAmount,
         total,
         discountCode,

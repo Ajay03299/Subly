@@ -50,6 +50,8 @@ interface Subscription {
     endDate: string | null;
   } | null;
   paymentTerms: string | null;
+  discountCode?: string | null;
+  discountAmount?: number;
   subtotal: number;
   taxAmount: number;
   totalAmount: number;
@@ -61,6 +63,7 @@ interface Subscription {
     unitPrice: number;
     taxRate: number;
     amount: number;
+    tax?: { id: string; name: string; rate: number } | null;
   }>;
   createdAt: string;
 }
@@ -127,6 +130,31 @@ function OrderConfirmationContent() {
   const handleDownload = () => {
     if (!order) return;
 
+    const computedSubtotal = Number(order.subtotal);
+    const computedDiscount = Number(order.discountAmount || 0);
+    const afterDiscount = Math.max(computedSubtotal - computedDiscount, 0);
+    const taxRatio = computedSubtotal > 0 ? afterDiscount / computedSubtotal : 1;
+
+    const taxGroups = new Map<string, { rate: number; name: string; amount: number }>();
+    order.lines.forEach((line) => {
+      const rate = Number(line.tax?.rate ?? line.taxRate ?? 0);
+      if (rate <= 0) return;
+      const lineTaxAmount = Number(line.unitPrice) * line.quantity * (rate / 100);
+      const key = line.tax?.id || `rate-${rate}`;
+      const name = line.tax?.name || `Tax (${rate.toFixed(0)}%)`;
+      const existing = taxGroups.get(key);
+      if (existing) {
+        existing.amount += lineTaxAmount;
+      } else {
+        taxGroups.set(key, { rate, name, amount: lineTaxAmount });
+      }
+    });
+
+    const adjustedTaxBreakdown = Array.from(taxGroups.values()).map((tax) => ({
+      ...tax,
+      amount: tax.amount * taxRatio,
+    }));
+
     generateOrderPdf({
       subscriptionNo: order.subscriptionNo,
       status: order.status,
@@ -142,7 +170,10 @@ function OrderConfirmationContent() {
         taxRate: Number(l.taxRate),
         amount: Number(l.amount),
       })),
+      discountCode: order.discountCode || undefined,
+      discountAmount: Number(order.discountAmount || 0),
       subtotal: Number(order.subtotal),
+      taxBreakdown: adjustedTaxBreakdown,
       taxAmount: Number(order.taxAmount),
       totalAmount: Number(order.totalAmount),
     });
@@ -202,6 +233,7 @@ function OrderConfirmationContent() {
 
   /* ── Computed ───────────────────────────────────────── */
   const subtotal = Number(order.subtotal);
+  const discountAmount = Number(order.discountAmount || 0);
   const taxAmount = Number(order.taxAmount);
   const total = Number(order.totalAmount);
 
@@ -266,9 +298,11 @@ function OrderConfirmationContent() {
                       {formatCurrency(Number(line.unitPrice))}
                     </TableCell>
                     <TableCell className="text-right">
-                      {Number(line.taxRate) > 0
-                        ? `${Number(line.taxRate)}%`
-                        : "—"}
+                      {line.tax
+                        ? `${line.tax.name} (${Number(line.tax.rate)}%)`
+                        : Number(line.taxRate) > 0
+                          ? `${Number(line.taxRate)}%`
+                          : "—"}
                     </TableCell>
                     <TableCell className="text-right font-medium tabular-nums">
                       {formatCurrency(Number(line.amount))}
@@ -285,10 +319,40 @@ function OrderConfirmationContent() {
               <span className="text-muted-foreground">Subtotal</span>
               <span className="tabular-nums">{formatCurrency(subtotal)}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Tax</span>
-              <span className="tabular-nums">{formatCurrency(taxAmount)}</span>
-            </div>
+            {discountAmount > 0 && (
+              <div className="flex justify-between text-green-600">
+                <span>
+                  Discount {order.discountCode && `(${order.discountCode})`}
+                </span>
+                <span className="tabular-nums">-{formatCurrency(discountAmount)}</span>
+              </div>
+            )}
+            {(() => {
+              const taxRatio = subtotal > 0 ? (subtotal - discountAmount) / subtotal : 1;
+              const taxGroups = new Map<string, { name: string; amount: number }>();
+              order.lines.forEach((line) => {
+                const rate = Number(line.tax?.rate ?? line.taxRate ?? 0);
+                if (rate <= 0) return;
+                const lineTaxAmount = Number(line.unitPrice) * line.quantity * (rate / 100);
+                const key = line.tax?.id || `rate-${rate}`;
+                const name = line.tax?.name || `Tax (${rate.toFixed(0)}%)`;
+                const existing = taxGroups.get(key);
+                if (existing) {
+                  existing.amount += lineTaxAmount;
+                } else {
+                  taxGroups.set(key, { name, amount: lineTaxAmount });
+                }
+              });
+
+              return Array.from(taxGroups.values()).map((tax) => (
+                <div key={tax.name} className="flex justify-between">
+                  <span className="text-muted-foreground">{tax.name}</span>
+                  <span className="tabular-nums">
+                    {formatCurrency(tax.amount * taxRatio)}
+                  </span>
+                </div>
+              ));
+            })()}
             <hr className="border-border" />
             <div className="flex justify-between text-base font-bold">
               <span>Total</span>

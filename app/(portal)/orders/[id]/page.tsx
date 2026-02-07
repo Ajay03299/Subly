@@ -53,6 +53,8 @@ interface Subscription {
     endDate: string | null;
   } | null;
   paymentTerms: string | null;
+  discountCode: string | null;
+  discountAmount: number;
   subtotal: number;
   taxAmount: number;
   totalAmount: number;
@@ -64,6 +66,7 @@ interface Subscription {
     unitPrice: number;
     taxRate: number;
     amount: number;
+    tax?: { id: string; name: string; rate: number } | null;
   }>;
   invoices: Array<{
     id: string;
@@ -133,8 +136,31 @@ export default function OrderDetailPage() {
   const [renewLoading, setRenewLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [taxNames, setTaxNames] = useState<Record<number, string>>({});
 
   const getToken = () => localStorage.getItem("accessToken") ?? "";
+
+  /* ── Fetch tax names ────────────────────────────────── */
+  useEffect(() => {
+    const fetchTaxNames = async () => {
+      try {
+        const res = await fetch("/api/portal/tax/all", {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const names: Record<number, string> = {};
+          data.taxes?.forEach((tax: { rate: number; name: string }) => {
+            names[Number(tax.rate)] = tax.name;
+          });
+          setTaxNames(names);
+        }
+      } catch {
+        // Silent fail
+      }
+    };
+    fetchTaxNames();
+  }, []);
 
   /* ── Fetch order ────────────────────────────────────── */
   const fetchOrder = useCallback(async () => {
@@ -210,6 +236,32 @@ export default function OrderDetailPage() {
   const handleDownload = () => {
     if (!order) return;
 
+    const computedSubtotal = Number(order.subtotal);
+    const computedDiscount = Number(order.discountAmount || 0);
+    const afterDiscount = Math.max(computedSubtotal - computedDiscount, 0);
+    const taxRatio = computedSubtotal > 0 ? afterDiscount / computedSubtotal : 1;
+
+    // Group taxes by bracket for PDF
+    const taxGroups = new Map<string, { rate: number; name: string; amount: number }>();
+    order.lines.forEach((line) => {
+      const rate = Number(line.tax?.rate ?? line.taxRate ?? 0);
+      if (rate > 0) {
+        const lineTaxAmount = Number(line.unitPrice) * line.quantity * (rate / 100);
+        const key = line.tax?.id || `rate-${rate}`;
+        const name = line.tax?.name || taxNames[rate] || `Tax (${rate.toFixed(0)}%)`;
+        const existing = taxGroups.get(key);
+        if (existing) {
+          existing.amount += lineTaxAmount;
+        } else {
+          taxGroups.set(key, {
+            rate,
+            name,
+            amount: lineTaxAmount,
+          });
+        }
+      }
+    });
+
     generateOrderPdf({
       subscriptionNo: order.subscriptionNo,
       status: statusLabel(order.status),
@@ -225,7 +277,13 @@ export default function OrderDetailPage() {
         taxRate: Number(l.taxRate),
         amount: Number(l.amount),
       })),
+      discountCode: order.discountCode || undefined,
+      discountAmount: Number(order.discountAmount),
       subtotal: Number(order.subtotal),
+      taxBreakdown: Array.from(taxGroups.values()).map((t) => ({
+        ...t,
+        amount: t.amount * taxRatio,
+      })),
       taxAmount: Number(order.taxAmount),
       totalAmount: Number(order.totalAmount),
     });
@@ -507,9 +565,11 @@ export default function OrderDetailPage() {
                         {formatCurrency(Number(line.unitPrice))}
                       </TableCell>
                       <TableCell className="text-right">
-                        {Number(line.taxRate) > 0
-                          ? `${Number(line.taxRate)}%`
-                          : "—"}
+                        {line.tax
+                          ? `${line.tax.name} (${Number(line.tax.rate)}%)`
+                          : Number(line.taxRate) > 0
+                            ? `${Number(line.taxRate)}%`
+                            : "—"}
                       </TableCell>
                       <TableCell className="text-right font-medium tabular-nums">
                         {formatCurrency(Number(line.amount))}
@@ -526,12 +586,41 @@ export default function OrderDetailPage() {
                     {formatCurrency(subtotal)}
                   </span>
                 </div>
-                <div className="flex w-52 justify-between">
-                  <span className="text-muted-foreground">Tax</span>
-                  <span className="tabular-nums">
-                    {formatCurrency(taxAmount)}
-                  </span>
-                </div>
+                {order.discountAmount > 0 && (
+                  <div className="flex w-52 justify-between text-green-600">
+                    <span>Discount {order.discountCode && `(${order.discountCode})`}</span>
+                    <span className="tabular-nums">
+                      −{formatCurrency(Number(order.discountAmount))}
+                    </span>
+                  </div>
+                )}
+                {(() => {
+                  const taxRatio = subtotal > 0 ? (subtotal - Number(order.discountAmount || 0)) / subtotal : 1;
+                  const taxGroups = new Map<string, { name: string; rate: number; amount: number }>();
+                  order.lines.forEach((line) => {
+                    const rate = Number(line.tax?.rate ?? line.taxRate ?? 0);
+                    if (rate > 0) {
+                      const lineTaxAmount = Number(line.unitPrice) * line.quantity * (rate / 100);
+                      const key = line.tax?.id || `rate-${rate}`;
+                      const name = line.tax?.name || taxNames[rate] || `Tax (${rate.toFixed(0)}%)`;
+                      const existing = taxGroups.get(key);
+                      if (existing) {
+                        existing.amount += lineTaxAmount;
+                      } else {
+                        taxGroups.set(key, { name, rate, amount: lineTaxAmount });
+                      }
+                    }
+                  });
+
+                  return Array.from(taxGroups.values()).map((tax) => (
+                    <div key={tax.name} className="flex w-52 justify-between">
+                      <span className="text-muted-foreground">{tax.name}</span>
+                      <span className="tabular-nums">
+                        {formatCurrency(tax.amount * taxRatio)}
+                      </span>
+                    </div>
+                  ));
+                })()}
                 <div className="flex w-52 justify-between border-t pt-1 font-semibold">
                   <span>Total</span>
                   <span className="tabular-nums">

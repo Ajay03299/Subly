@@ -38,7 +38,10 @@ interface OrderPdfData {
     taxRate: number;
     amount: number;
   }>;
+  discountCode?: string;
+  discountAmount?: number;
   subtotal: number;
+  taxBreakdown?: Array<{ rate: number; name: string; amount: number }>;
   taxAmount: number;
   totalAmount: number;
 }
@@ -126,9 +129,28 @@ export function generateOrderPdf(data: OrderPdfData) {
   doc.text("Untaxed Amount", totalsX, y);
   doc.text(formatCurrency(data.subtotal), amountX, y, { align: "right" });
 
-  y += 7;
-  doc.text("Tax", totalsX, y);
-  doc.text(formatCurrency(data.taxAmount), amountX, y, { align: "right" });
+  // Discount
+  if (data.discountAmount && data.discountAmount > 0) {
+    y += 7;
+    doc.setTextColor(34, 139, 34); // Green color
+    const discountLabel = data.discountCode ? `Discount (${data.discountCode})` : "Discount";
+    doc.text(discountLabel, totalsX, y);
+    doc.text(`−${formatCurrency(data.discountAmount)}`, amountX, y, { align: "right" });
+    doc.setTextColor(100, 100, 100); // Reset color
+  }
+
+  // Tax breakdown
+  if (data.taxBreakdown && data.taxBreakdown.length > 0) {
+    data.taxBreakdown.forEach((tax) => {
+      y += 7;
+      doc.text(tax.name, totalsX, y);
+      doc.text(formatCurrency(tax.amount), amountX, y, { align: "right" });
+    });
+  } else {
+    y += 7;
+    doc.text("Tax", totalsX, y);
+    doc.text(formatCurrency(data.taxAmount), amountX, y, { align: "right" });
+  }
 
   y += 2;
   doc.setDrawColor(180, 180, 180);
@@ -169,9 +191,13 @@ interface InvoicePdfData {
     quantity: number;
     unitPrice: number;
     taxRate?: number;
+    taxName?: string;
     amount: number;
   }>;
+  discountCode?: string;
+  discountAmount?: number;
   subtotal: number;
+  taxBreakdown?: Array<{ name: string; amount: number }>;
   taxAmount: number;
   totalAmount: number;
   isPaid: boolean;
@@ -266,9 +292,28 @@ export function generateInvoicePdf(data: InvoicePdfData) {
   doc.text("Untaxed Amount", totalsX, y);
   doc.text(formatCurrency(data.subtotal), amountX, y, { align: "right" });
 
-  y += 7;
-  doc.text("Tax", totalsX, y);
-  doc.text(formatCurrency(data.taxAmount), amountX, y, { align: "right" });
+  // Discount
+  if (data.discountAmount && data.discountAmount > 0) {
+    y += 7;
+    doc.setTextColor(34, 139, 34); // Green color
+    const discountLabel = data.discountCode ? `Discount (${data.discountCode})` : "Discount";
+    doc.text(discountLabel, totalsX, y);
+    doc.text(`−${formatCurrency(data.discountAmount)}`, amountX, y, { align: "right" });
+    doc.setTextColor(100, 100, 100); // Reset color
+  }
+
+  // Tax breakdown
+  if (data.taxBreakdown && data.taxBreakdown.length > 0) {
+    data.taxBreakdown.forEach((tax) => {
+      y += 7;
+      doc.text(tax.name, totalsX, y);
+      doc.text(formatCurrency(tax.amount), amountX, y, { align: "right" });
+    });
+  } else {
+    y += 7;
+    doc.text("Tax", totalsX, y);
+    doc.text(formatCurrency(data.taxAmount), amountX, y, { align: "right" });
+  }
 
   y += 2;
   doc.setDrawColor(180, 180, 180);

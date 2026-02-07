@@ -111,10 +111,12 @@ model Product {
   salesPrice         Decimal     @db.Decimal(10, 2)
   costPrice          Decimal     @db.Decimal(10, 2)
   tagId              String?
+    taxId              String?     // Tax bracket this product belongs to
   averageRating      Decimal     @default(0) @db.Decimal(3, 2) // 0-5 rating
 
   variants               Variant[]
   tag                    ProductTag? @relation(fields: [tagId], references: [id])
+    tax                    Tax?        @relation(fields: [taxId], references: [id])
   images                 ProductImage[]
   recurringPlans         RecurringPlan[]
   subscriptionLines      SubscriptionLine[]
@@ -217,6 +219,10 @@ model Subscription {
 
   status SubscriptionStatus @default(DRAFT)
 
+  // Discount information
+  discountCode   String? // the code applied, if any
+  discountAmount Decimal @default(0) @db.Decimal(12, 2) // amount discounted
+
   // Computed totals — kept in sync by application logic
   subtotal    Decimal @default(0) @db.Decimal(12, 2)
   taxAmount   Decimal @default(0) @db.Decimal(12, 2)
@@ -244,6 +250,9 @@ model SubscriptionLine {
 
   productId String
   product   Product @relation(fields: [productId], references: [id])
+  taxId     String?
+  tax       Tax?    @relation(fields: [taxId], references: [id])
+
 
   quantity  Int
   unitPrice Decimal @db.Decimal(10, 2) // price after any discount
@@ -304,6 +313,8 @@ model Tax {
   name      String // e.g. "GST 18%", "VAT 20%"
   rate      Decimal @db.Decimal(5, 2) // percentage value
   isDefault Boolean @default(false) // if true, auto-applied to new lines
+  products         Product[]
+  subscriptionLines SubscriptionLine[]
 
   invoiceLines InvoiceLine[]
 
@@ -403,6 +414,7 @@ model Payment {
 model Discount {
   id              String       @id @default(cuid())
   name            String
+  code            String       @unique
   type            DiscountType
   value           Decimal      @db.Decimal(10, 2) // fixed amount or percentage
   minimumPurchase Decimal      @default(0) @db.Decimal(10, 2)

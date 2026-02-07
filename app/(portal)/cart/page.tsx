@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -8,11 +8,11 @@ import {
   Minus,
   Plus,
   ArrowLeft,
-  Tag,
   ShoppingBag,
   CheckCircle2,
   Loader2,
   AlertCircle,
+  Tag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useCart } from "@/lib/cart-context";
+import { TaxBreakdown } from "@/components/tax-breakdown";
 
 export default function CartPage() {
   const router = useRouter();
@@ -39,8 +40,9 @@ export default function CartPage() {
     items,
     removeItem,
     updateQuantity,
+    refreshItemTaxes,
     subtotal,
-    taxRate,
+    taxBreakdown,
     taxAmount,
     total,
     discountCode,
@@ -53,6 +55,21 @@ export default function CartPage() {
 
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
+  useEffect(() => {
+    console.log("Cart tax breakdown:", taxBreakdown);
+  }, [taxBreakdown]);
+
+  useEffect(() => {
+    console.log(
+      "Cart item taxes:",
+      items.map((i) => ({ id: i.product.id, tax: i.product.tax }))
+    );
+  }, [items]);
+
+  useEffect(() => {
+    refreshItemTaxes();
+  }, [refreshItemTaxes]);
 
   async function handleCheckout() {
     setCheckoutLoading(true);
@@ -82,13 +99,13 @@ export default function CartPage() {
             : item.plan?.billingPeriod ?? "MONTHLY";
 
         return {
+          productId: item.product.id,
           productName: item.product.name,
           productType: item.product.type,
           salesPrice: item.product.salesPrice,
           costPrice: item.product.costPrice,
           unitPrice,
           quantity: item.quantity,
-          taxRate: item.product.taxRate,
           plan: planLabel,
           variantInfo: item.selectedVariant
             ? `${item.selectedVariant.attribute}: ${item.selectedVariant.value}`
@@ -109,6 +126,7 @@ export default function CartPage() {
           total,
           discountApplied,
           discountAmount,
+          discountCode,
         }),
       });
 
@@ -177,6 +195,7 @@ export default function CartPage() {
                   <TableHead>Plan</TableHead>
                   <TableHead className="text-center">Qty</TableHead>
                   <TableHead className="text-right">Price</TableHead>
+                  <TableHead className="text-right">Tax</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
@@ -265,6 +284,13 @@ export default function CartPage() {
                         ₹{lineTotal.toLocaleString()}
                       </TableCell>
 
+                      {/* Tax */}
+                      <TableCell className="text-right text-sm text-muted-foreground">
+                        {item.product.tax
+                          ? `${item.product.tax.name} (${Number(item.product.tax.rate)}%)`
+                          : "—"}
+                      </TableCell>
+
                       {/* Remove */}
                       <TableCell>
                         <button
@@ -323,40 +349,13 @@ export default function CartPage() {
 
               <hr className="border-border" />
 
-              {/* Totals */}
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-medium">
-                    ₹{subtotal.toLocaleString()}
-                  </span>
-                </div>
-
-                {discountApplied && (
-                  <div className="flex justify-between text-chart-2">
-                    <span>Discount</span>
-                    <span>−₹{discountAmount.toLocaleString()}</span>
-                  </div>
-                )}
-
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    Taxes ({(taxRate * 100).toFixed(0)}%)
-                  </span>
-                  <span className="font-medium">
-                    ₹{taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-
-                <hr className="border-border" />
-
-                <div className="flex justify-between text-base font-bold">
-                  <span>Total</span>
-                  <span>
-                    ₹{total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-              </div>
+              {/* Totals using TaxBreakdown component */}
+              <TaxBreakdown
+                subtotal={subtotal}
+                discountAmount={discountAmount}
+                taxAmount={taxAmount}
+                taxBreakdown={taxBreakdown}
+              />
 
               {/* Checkout error */}
               {checkoutError && (

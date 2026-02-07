@@ -32,6 +32,12 @@ interface ProductTag {
   name: string;
 }
 
+interface Tax {
+  id: string;
+  name: string;
+  rate: number;
+}
+
 interface RecurringPlan {
   id?: string;
   name: string;
@@ -59,6 +65,8 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
   const [description, setDescription] = useState("");
   const [tagId, setTagId] = useState("");
   const [tags, setTags] = useState<ProductTag[]>([]);
+    const [taxId, setTaxId] = useState("");
+    const [taxes, setTaxes] = useState<Tax[]>([]);
   const [images, setImages] = useState<ProductImage[]>([]);
   const [imageUrl, setImageUrl] = useState("");
   const [imageAlt, setImageAlt] = useState("");
@@ -98,8 +106,22 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
         // silent
       }
     };
+    const fetchTaxes = async () => {
+      try {
+        const res = await fetch("/api/admin/taxes", {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setTaxes(data.taxes || []);
+      } catch {
+        // silent
+      }
+    };
+
 
     fetchTags();
+    fetchTaxes();
   }, []);
 
   const addVariant = () => {
@@ -188,8 +210,8 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
     setError(null);
 
     // Validate basic product fields
-    if (!name || !salesPrice || !costPrice) {
-      setError("Please fill in all required product fields");
+    if (!name || !salesPrice || !costPrice || !taxId) {
+      setError("Please fill in all required product fields and select a tax bracket");
       return;
     }
 
@@ -202,6 +224,7 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
           costPrice: parseFloat(costPrice),
           description: description || null,
           tagId: tagId || null,
+                    taxId: taxId || null,
           images,
         },
         variants,
@@ -290,6 +313,28 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
                   tags.map((tag) => (
                     <SelectItem key={tag.id} value={tag.id}>
                       {tag.name}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="taxId">Tax Bracket *</Label>
+            <Select value={taxId} onValueChange={setTaxId}>
+              <SelectTrigger id="taxId">
+                <SelectValue placeholder="Select a tax bracket" />
+              </SelectTrigger>
+              <SelectContent position="popper">
+                {taxes.length === 0 ? (
+                  <SelectItem value="no-taxes" disabled>
+                    No taxes available - Create one first
+                  </SelectItem>
+                ) : (
+                  taxes.map((tax) => (
+                    <SelectItem key={tax.id} value={tax.id}>
+                      {tax.name} ({Number(tax.rate)}%)
                     </SelectItem>
                   ))
                 )}

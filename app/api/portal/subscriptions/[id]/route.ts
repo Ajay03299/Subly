@@ -38,12 +38,12 @@ export async function GET(
         user: { select: { id: true, email: true } },
         recurringPlan: true,
         lines: {
-          include: { product: true },
+          include: { product: true, tax: true },
         },
         invoices: {
           orderBy: { createdAt: "desc" },
           include: {
-            lines: { include: { product: true } },
+            lines: { include: { product: true, tax: true } },
             payments: true,
           },
         },

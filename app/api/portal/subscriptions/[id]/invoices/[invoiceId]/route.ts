@@ -37,7 +37,13 @@ export async function GET(
       where: { id: invoiceId },
       include: {
         subscription: {
-          select: { id: true, userId: true, subscriptionNo: true },
+          select: { 
+            id: true, 
+            userId: true, 
+            subscriptionNo: true,
+            discountCode: true,
+            discountAmount: true,
+          },
         },
         lines: {
           include: { product: true, tax: true },

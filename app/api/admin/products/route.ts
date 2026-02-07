@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
       costPrice,
       description,
       tagId,
+        taxId,
       images,
     } = await request.json();
 
@@ -74,6 +75,7 @@ export async function POST(request: NextRequest) {
         costPrice: cost,
         description: description || null,
         tag: tagId ? { connect: { id: tagId } } : undefined,
+          tax: taxId ? { connect: { id: taxId } } : undefined,
         images: {
           create: images && Array.isArray(images) ? images.map((img: any) => ({
             url: img.url,
@@ -85,6 +87,7 @@ export async function POST(request: NextRequest) {
         variants: true,
         recurringPlans: true,
         tag: true,
+          tax: true,
         images: true,
       },
     });
@@ -128,6 +131,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch all products
     const products = await prisma.product.findMany({
+        tax: true,
       include: {
         variants: true,
         recurringPlans: true,

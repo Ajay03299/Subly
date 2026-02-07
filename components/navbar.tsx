@@ -146,6 +146,27 @@ export function Navbar() {
                   {tagError && (
                     <div className="mt-2 text-xs text-destructive">{tagError}</div>
                   )}
+
+                  <div className="mt-4 border-t border-border pt-3">
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="mb-2 w-full"
+                      onClick={() => setConfigOpen(false)}
+                    >
+                      <Link href="/internal/discounts">Manage Discounts</Link>
+                    </Button>
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => setConfigOpen(false)}
+                    >
+                      <Link href="/internal/taxes">Manage Taxes</Link>
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>

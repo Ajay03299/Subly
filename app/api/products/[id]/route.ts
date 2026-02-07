@@ -13,6 +13,7 @@ export async function GET(
       include: {
         images: true,
         tag: true,
+        tax: true,
         variants: true,
         recurringPlans: true,
       },

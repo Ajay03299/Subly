@@ -67,6 +67,55 @@ async function findOrCreateProduct(item: {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Helper: validate discount code                                    */
+/* ------------------------------------------------------------------ */
+async function validateDiscount(
+  code: string,
+  subtotal: number,
+  quantity: number
+) {
+  const discount = await prisma.discount.findFirst({
+    where: {
+      code: {
+        equals: code,
+        mode: "insensitive",
+      },
+    },
+  });
+
+  if (!discount) {
+    return { error: "Invalid discount code" };
+  }
+
+  const now = new Date();
+  if (discount.startDate > now) {
+    return { error: "Discount not active yet" };
+  }
+
+  if (discount.endDate && discount.endDate < now) {
+    return { error: "Discount has expired" };
+  }
+
+  if (subtotal < Number(discount.minimumPurchase)) {
+    return { error: "Minimum purchase not met" };
+  }
+
+  if (quantity < discount.minimumQuantity) {
+    return { error: "Minimum quantity not met" };
+  }
+
+  const value = Number(discount.value);
+  const discountAmount = discount.type === "PERCENTAGE"
+    ? subtotal * (value / 100)
+    : value;
+
+  return {
+    discount,
+    discountAmount: Math.min(discountAmount, subtotal),
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /*  POST /api/portal/checkout                                          */
 /*  Creates a real subscription from the cart items                     */
 /* ------------------------------------------------------------------ */
@@ -88,6 +137,7 @@ export async function POST(request: NextRequest) {
       total,
       discountApplied,
       discountAmount,
+      discountCode,
       paymentTerms,
     } = body;
 
@@ -100,41 +150,67 @@ export async function POST(request: NextRequest) {
 
     const subscriptionNo = await generateSubscriptionNo();
 
+    const defaultTax = await prisma.tax.findFirst({
+      where: { isDefault: true },
+      select: { id: true, name: true, rate: true },
+    });
+
     // Build subscription lines from cart items
     const lineData = [];
     for (const item of items) {
       const {
+        productId: clientProductId,
         productName,
         productType,
         salesPrice,
         costPrice,
         unitPrice,
         quantity,
-        taxRate,
         plan,
         variantInfo,
       } = item;
 
-      // Find or create the product in the DB
-      const productId = await findOrCreateProduct({
-        productName,
-        productType: productType || "SERVICE",
-        salesPrice: salesPrice || unitPrice,
-        costPrice: costPrice || 0,
-      });
+      // Fetch product from DB to get its tax
+      let productId = clientProductId;
+      let product = null;
+      
+      if (productId) {
+        product = await prisma.product.findUnique({
+          where: { id: productId },
+          include: { tax: true },
+        });
+      }
+      
+      if (!product) {
+        // Fallback: find or create the product in the DB
+        productId = await findOrCreateProduct({
+          productName,
+          productType: productType || "SERVICE",
+          salesPrice: salesPrice || unitPrice,
+          costPrice: costPrice || 0,
+        });
+        
+        product = await prisma.product.findUnique({
+          where: { id: productId },
+          include: { tax: true },
+        });
+      }
 
       const qty = quantity || 1;
       const price = unitPrice || salesPrice || 0;
-      const tax = taxRate || 0;
+      const effectiveTax = product?.tax || defaultTax || null;
+      const taxRate = effectiveTax ? Number(effectiveTax.rate) : 0;
+      const taxId = product?.taxId || effectiveTax?.id || null;
       const lineSubtotal = qty * price;
-      const lineTax = lineSubtotal * (tax / 100);
+      const lineTax = lineSubtotal * (taxRate / 100);
       const lineTotal = lineSubtotal + lineTax;
 
       lineData.push({
         productId,
+        taxId,
         quantity: qty,
         unitPrice: price,
-        taxRate: tax,
+        taxRate,
         amount: lineTotal,
       });
     }
@@ -143,13 +219,36 @@ export async function POST(request: NextRequest) {
     const computedSubtotal =
       subtotal ??
       lineData.reduce((s, l) => s + l.quantity * Number(l.unitPrice), 0);
-    const computedTax =
+    const baseTax =
       taxAmount ??
       lineData.reduce(
         (s, l) => s + l.quantity * Number(l.unitPrice) * (Number(l.taxRate) / 100),
         0
       );
-    const computedTotal = total ?? computedSubtotal + computedTax;
+
+    let appliedDiscountAmount = discountApplied ? Number(discountAmount || 0) : 0;
+    if (discountCode) {
+      const totalQty = lineData.reduce((s, l) => s + l.quantity, 0);
+      const validation = await validateDiscount(
+        String(discountCode).trim(),
+        computedSubtotal,
+        totalQty
+      );
+
+      if ("error" in validation) {
+        return NextResponse.json(
+          { error: validation.error },
+          { status: 400 }
+        );
+      }
+
+      appliedDiscountAmount = validation.discountAmount;
+    }
+
+    const afterDiscount = Math.max(computedSubtotal - appliedDiscountAmount, 0);
+    const taxRatio = computedSubtotal > 0 ? afterDiscount / computedSubtotal : 1;
+    const computedTax = baseTax * taxRatio;
+    const computedTotal = afterDiscount + computedTax;
 
     // Create the subscription with status CONFIRMED (order placed)
     const subscription = await prisma.subscription.create({
@@ -158,6 +257,8 @@ export async function POST(request: NextRequest) {
         userId,
         paymentTerms: paymentTerms || "IMMEDIATE",
         status: "CONFIRMED",
+        discountCode: discountCode || null,
+        discountAmount: appliedDiscountAmount,
         subtotal: computedSubtotal,
         taxAmount: computedTax,
         totalAmount: computedTotal,
@@ -221,6 +322,31 @@ export async function POST(request: NextRequest) {
         payments: true,
       },
     });
+
+    // Optionally create an initial invoice for this subscription
+    if (subscription) {
+      await prisma.invoice.create({
+        data: {
+          invoiceNo: `INV-${subscription.subscriptionNo}`,
+          subscriptionId: subscription.id,
+          status: "DRAFT",
+          issueDate: new Date(),
+          subtotal: computedSubtotal,
+          taxAmount: computedTax,
+          totalAmount: computedTotal,
+          lines: {
+            create: lineData.map((line) => ({
+              productId: line.productId,
+                            taxId: line.taxId,
+              quantity: line.quantity,
+              unitPrice: line.unitPrice,
+              taxAmount: line.quantity * line.unitPrice * (line.taxRate / 100),
+              amount: line.amount,
+            })),
+          },
+        },
+      });
+    }
 
     return NextResponse.json(
       {

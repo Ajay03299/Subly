@@ -42,10 +42,14 @@ interface Invoice {
   subtotal: number;
   taxAmount: number;
   totalAmount: number;
+  discountAmount?: number;
+  discountCode?: string | null;
   subscription: {
     id: string;
     userId: string;
     subscriptionNo: string;
+    discountCode?: string | null;
+    discountAmount?: number;
   };
   lines: Array<{
     id: string;
@@ -85,8 +89,31 @@ export default function InvoiceDetailPage() {
   const [userEmail, setUserEmail] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [taxNames, setTaxNames] = useState<Record<number, string>>({});
 
   const getToken = () => localStorage.getItem("accessToken") ?? "";
+
+  /* ── Fetch tax names ────────────────────────────────── */
+  useEffect(() => {
+    const fetchTaxNames = async () => {
+      try {
+        const res = await fetch("/api/portal/tax/all", {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const names: Record<number, string> = {};
+          data.taxes?.forEach((tax: { rate: number; name: string }) => {
+            names[Number(tax.rate)] = tax.name;
+          });
+          setTaxNames(names);
+        }
+      } catch {
+        // Silent fail
+      }
+    };
+    fetchTaxNames();
+  }, []);
 
   /* ── Fetch invoice ──────────────────────────────────── */
   const fetchInvoice = useCallback(async () => {
@@ -140,6 +167,42 @@ export default function InvoiceDetailPage() {
       invoice.status === "PAID" || invoice.payments.length > 0;
     const paidPayment = invoice.payments.length > 0 ? invoice.payments[0] : null;
 
+    const discountValue = Number(invoice.discountAmount || invoice.subscription.discountAmount || 0);
+    const taxRatio = Number(invoice.subtotal) > 0 ? (Number(invoice.subtotal) - discountValue) / Number(invoice.subtotal) : 1;
+
+    // Group taxes by rate or tax name for breakdown
+    const taxGroups = new Map<string, { name: string; amount: number }>();
+    invoice.lines.forEach((line) => {
+      if (line.tax) {
+        const key = line.tax.id;
+        const existing = taxGroups.get(key);
+        if (existing) {
+          existing.amount += Number(line.taxAmount);
+        } else {
+          taxGroups.set(key, {
+            name: `${line.tax.name} (${Number(line.tax.rate)}%)`,
+            amount: Number(line.taxAmount),
+          });
+        }
+      } else if (Number(line.taxAmount) > 0) {
+        // Fallback: calculate rate from taxAmount and line total
+        const lineSubtotal = Number(line.unitPrice) * line.quantity;
+        const rate = lineSubtotal > 0 ? (Number(line.taxAmount) / lineSubtotal) * 100 : 0;
+        const roundedRate = Math.round(rate * 100) / 100;
+        const key = `rate-${roundedRate}`;
+        const existing = taxGroups.get(key);
+        const taxLabel = taxNames[roundedRate] || `Tax (${roundedRate.toFixed(0)}%)`;
+        if (existing) {
+          existing.amount += Number(line.taxAmount);
+        } else {
+          taxGroups.set(key, {
+            name: taxLabel,
+            amount: Number(line.taxAmount),
+          });
+        }
+      }
+    });
+
     generateInvoicePdf({
       invoiceNo: invoice.invoiceNo,
       subscriptionNo: invoice.subscription.subscriptionNo,
@@ -153,9 +216,16 @@ export default function InvoiceDetailPage() {
         quantity: l.quantity,
         unitPrice: Number(l.unitPrice),
         taxRate: l.tax ? Number(l.tax.rate) : undefined,
+        taxName: l.tax?.name,
         amount: Number(l.amount),
       })),
+      discountCode: invoice.discountCode || invoice.subscription.discountCode || undefined,
+      discountAmount: Number(invoice.discountAmount || invoice.subscription.discountAmount || 0),
       subtotal: Number(invoice.subtotal),
+      taxBreakdown: Array.from(taxGroups.values()).map((t) => ({
+        ...t,
+        amount: t.amount * taxRatio,
+      })),
       taxAmount: Number(invoice.taxAmount),
       totalAmount: Number(invoice.totalAmount),
       isPaid,
@@ -345,12 +415,61 @@ export default function InvoiceDetailPage() {
                   {formatCurrency(subtotal)}
                 </span>
               </div>
-              <div className="flex w-52 justify-between">
-                <span className="text-muted-foreground">Tax</span>
-                <span className="tabular-nums">
-                  {formatCurrency(taxAmount)}
-                </span>
-              </div>
+              {(invoice.discountAmount || invoice.subscription.discountAmount) && Number(invoice.discountAmount || invoice.subscription.discountAmount) > 0 && (
+                <div className="flex w-52 justify-between text-green-600">
+                  <span>
+                    Discount {(invoice.discountCode || invoice.subscription.discountCode) && `(${invoice.discountCode || invoice.subscription.discountCode})`}
+                  </span>
+                  <span className="tabular-nums">
+                    −{formatCurrency(Number(invoice.discountAmount || invoice.subscription.discountAmount))}
+                  </span>
+                </div>
+              )}
+              {(() => {
+                const discountValue = Number(invoice.discountAmount || invoice.subscription.discountAmount || 0);
+                const taxRatio = subtotal > 0 ? (subtotal - discountValue) / subtotal : 1;
+                // Group taxes by rate or tax name
+                const taxGroups = new Map<string, { name: string; amount: number }>();
+                invoice.lines.forEach((line) => {
+                  if (line.tax) {
+                    const key = line.tax.id;
+                    const existing = taxGroups.get(key);
+                    if (existing) {
+                      existing.amount += Number(line.taxAmount);
+                    } else {
+                      taxGroups.set(key, {
+                        name: `${line.tax.name} (${Number(line.tax.rate)}%)`,
+                        amount: Number(line.taxAmount),
+                      });
+                    }
+                  } else if (Number(line.taxAmount) > 0) {
+                    // Fallback: calculate rate from taxAmount and line total
+                    const lineSubtotal = Number(line.unitPrice) * line.quantity;
+                    const rate = lineSubtotal > 0 ? (Number(line.taxAmount) / lineSubtotal) * 100 : 0;
+                    const roundedRate = Math.round(rate * 100) / 100;
+                    const key = `rate-${roundedRate}`;
+                    const existing = taxGroups.get(key);
+                    const taxLabel = taxNames[roundedRate] || `Tax (${roundedRate.toFixed(0)}%)`;
+                    if (existing) {
+                      existing.amount += Number(line.taxAmount);
+                    } else {
+                      taxGroups.set(key, {
+                        name: taxLabel,
+                        amount: Number(line.taxAmount),
+                      });
+                    }
+                  }
+                });
+
+                return Array.from(taxGroups.values()).map((tax, idx) => (
+                  <div key={idx} className="flex w-52 justify-between">
+                    <span className="text-muted-foreground">{tax.name}</span>
+                    <span className="tabular-nums">
+                      {formatCurrency(tax.amount * taxRatio)}
+                    </span>
+                  </div>
+                ));
+              })()}
               <div className="flex w-52 justify-between border-t pt-1 font-semibold">
                 <span>Total</span>
                 <span className="tabular-nums">{formatCurrency(total)}</span>

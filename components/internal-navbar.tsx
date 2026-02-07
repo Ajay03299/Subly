@@ -224,6 +224,12 @@ export function InternalNavbar() {
                   <Button asChild variant="outline" size="sm" className="mb-3 w-full" onClick={() => setConfigOpen(false)}>
                     <Link href="/internal/configuration">Manage Product Tags</Link>
                   </Button>
+                  <Button asChild variant="outline" size="sm" className="mb-3 w-full" onClick={() => setConfigOpen(false)}>
+                    <Link href="/internal/discounts">Manage Discounts</Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm" className="w-full" onClick={() => setConfigOpen(false)}>
+                    <Link href="/internal/taxes">Manage Taxes</Link>
+                  </Button>
 
                   {tagError && (
                     <div className="mt-2 text-xs text-destructive">{tagError}</div>

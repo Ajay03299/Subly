@@ -69,7 +69,7 @@ interface Product {
   images: ProductImage[];
   variants: Variant[];
   recurringPlans: RecurringPlan[];
-  taxRate: number;
+  tax?: { id: string; name: string; rate: number } | null;
 }
 
 const PRODUCT_TYPES: Record<string, string> = {
@@ -198,7 +198,8 @@ export default function ProductPage() {
 
   const unitPrice = basePrice + totalExtraPrice;
   const untaxedTotal = unitPrice * quantity;
-  const taxAmount = untaxedTotal * (product.taxRate / 100);
+  const taxRate = Number(product.tax?.rate ?? 0);
+  const taxAmount = untaxedTotal * (taxRate / 100);
   const grandTotal = untaxedTotal + taxAmount;
 
   /* ── variant helpers ───────────────────────────────── */
@@ -249,8 +250,8 @@ export default function ProductPage() {
           All Products
         </Link>
         <ChevronRight className="h-3.5 w-3.5" />
-        <Link href={`/?category=${product.category}`} className="hover:text-foreground transition-colors">
-          {product.category}
+        <Link href={`/shop?tag=${product.tag?.name}`} className="hover:text-foreground transition-colors">
+          {product.tag?.name}
         </Link>
         <ChevronRight className="h-3.5 w-3.5" />
         <span className="text-foreground font-medium">{product.name}</span>
@@ -310,9 +311,6 @@ export default function ProductPage() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary">{product.type}</Badge>
-              <Badge variant="outline">
-                {PRODUCT_TYPES[product.type] ?? product.type}
-              </Badge>
               {product.tag && <Badge>{product.tag.name}</Badge>}
             </div>
 
@@ -562,7 +560,9 @@ export default function ProductPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">
-                    Tax {product.taxRate}%
+                    {product.tax
+                      ? `${product.tax.name} (${Number(product.tax.rate)}%)`
+                      : "Tax"}
                   </span>
                   <span className="font-medium tabular-nums">
                     ₹
@@ -627,7 +627,9 @@ export default function ProductPage() {
                 <div>
                   <p className="text-sm font-medium">Tax</p>
                   <p className="text-xs text-muted-foreground">
-                    {product.taxRate}% included
+                    {product.tax
+                      ? `${product.tax.name} (${Number(product.tax.rate)}%)`
+                      : "—"}
                   </p>
                 </div>
               </CardContent>

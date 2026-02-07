@@ -73,11 +73,9 @@ interface PlanSubscription {
 
 interface RecurringPlan {
   id: string;
-  name: string;
   productId: string;
   price: number;
   billingPeriod: string;
-  minimumQuantity: number;
   autoClose: boolean;
   closeable: boolean;
   renewable: boolean;
@@ -149,11 +147,9 @@ export default function RecurringPlansPage() {
   const [activePlan, setActivePlan] = useState<RecurringPlan | null>(null);
 
   /* ── form state ─────────────────────────────────────── */
-  const [formName, setFormName] = useState("");
   const [formProductId, setFormProductId] = useState("");
   const [formPrice, setFormPrice] = useState("");
   const [formBillingPeriod, setFormBillingPeriod] = useState("MONTHLY");
-  const [formMinQty, setFormMinQty] = useState("1");
   const [formAutoClose, setFormAutoClose] = useState(false);
   const [formCloseable, setFormCloseable] = useState(true);
   const [formRenewable, setFormRenewable] = useState(true);
@@ -224,11 +220,9 @@ export default function RecurringPlansPage() {
 
   /* ── populate form from plan ────────────────────────── */
   function populateForm(plan: RecurringPlan) {
-    setFormName(plan.name);
     setFormProductId(plan.productId);
     setFormPrice(String(plan.price));
     setFormBillingPeriod(plan.billingPeriod);
-    setFormMinQty(String(plan.minimumQuantity));
     setFormAutoClose(plan.autoClose);
     setFormCloseable(plan.closeable);
     setFormRenewable(plan.renewable);
@@ -242,11 +236,9 @@ export default function RecurringPlansPage() {
   }
 
   function resetForm() {
-    setFormName("");
     setFormProductId("");
     setFormPrice("");
     setFormBillingPeriod("MONTHLY");
-    setFormMinQty("1");
     setFormAutoClose(false);
     setFormCloseable(true);
     setFormRenewable(true);
@@ -289,17 +281,14 @@ export default function RecurringPlansPage() {
 
   /* ── save (create / update) ─────────────────────────── */
   async function handleSave() {
-    if (!formName.trim()) return setError("Name is required");
     if (!formProductId) return setError("Product is required");
     if (!formPrice || isNaN(parseFloat(formPrice)))
       return setError("Valid price is required");
 
     const payload = {
-      name: formName.trim(),
       productId: formProductId,
       price: parseFloat(formPrice),
       billingPeriod: formBillingPeriod,
-      minimumQuantity: parseInt(formMinQty) || 1,
       autoClose: formAutoClose,
       closeable: formCloseable,
       renewable: formRenewable,
@@ -390,7 +379,6 @@ export default function RecurringPlansPage() {
   /* ── filtered list ──────────────────────────────────── */
   const filtered = plans.filter(
     (p) =>
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
       p.product?.name?.toLowerCase().includes(search.toLowerCase()) ||
       p.billingPeriod.toLowerCase().includes(search.toLowerCase())
   );
@@ -413,7 +401,9 @@ export default function RecurringPlansPage() {
             <h1 className="text-2xl font-bold tracking-tight">
               {isCreate
                 ? "New Recurring Plan"
-                : activePlan?.name || "Recurring Plan"}
+                : activePlan?.product?.name
+                  ? `${activePlan.product.name} — ${BILLING_PERIODS.find(b => b.value === activePlan.billingPeriod)?.label || activePlan.billingPeriod}`
+                  : "Recurring Plan"}
             </h1>
             {!isCreate && activePlan && (
               <p className="text-sm text-muted-foreground">
@@ -451,18 +441,6 @@ export default function RecurringPlansPage() {
                 <CardTitle className="text-base">Plan Details</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-5 sm:grid-cols-2">
-                {/* Name */}
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">
-                    Recurring Name <span className="text-destructive">*</span>
-                  </label>
-                  <Input
-                    value={formName}
-                    onChange={(e) => setFormName(e.target.value)}
-                    placeholder="e.g. Monthly Standard"
-                  />
-                </div>
-
                 {/* Product */}
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">
@@ -524,17 +502,6 @@ export default function RecurringPlansPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-
-                {/* Minimum Quantity */}
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Min. Quantity</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={formMinQty}
-                    onChange={(e) => setFormMinQty(e.target.value)}
-                  />
                 </div>
 
                 {/* Start Date */}
@@ -647,7 +614,6 @@ export default function RecurringPlansPage() {
                         <TableHead>Product</TableHead>
                         <TableHead>Variant</TableHead>
                         <TableHead className="text-right">Price</TableHead>
-                        <TableHead className="text-right">Min Qty.</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -664,9 +630,6 @@ export default function RecurringPlansPage() {
                           {BILLING_PERIODS.find(
                             (b) => b.value === activePlan.billingPeriod
                           )?.label.toLowerCase() || "period"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {activePlan.minimumQuantity} qty
                         </TableCell>
                       </TableRow>
                       {/* Variant rows */}
@@ -690,16 +653,13 @@ export default function RecurringPlansPage() {
                               (b) => b.value === activePlan.billingPeriod
                             )?.label.toLowerCase() || "period"}
                           </TableCell>
-                          <TableCell className="text-right">
-                            {activePlan.minimumQuantity} qty
-                          </TableCell>
                         </TableRow>
                       ))}
                       {(!activePlan.product.variants ||
                         activePlan.product.variants.length === 0) && (
                         <TableRow>
                           <TableCell
-                            colSpan={4}
+                            colSpan={3}
                             className="text-center text-xs text-muted-foreground"
                           >
                             No variants for this product
@@ -858,11 +818,9 @@ export default function RecurringPlansPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
                 <TableHead>Product</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Billing</TableHead>
-                <TableHead className="text-center">Min Qty</TableHead>
                 <TableHead className="text-center">Options</TableHead>
                 <TableHead className="text-center">Subs</TableHead>
               </TableRow>
@@ -874,8 +832,7 @@ export default function RecurringPlansPage() {
                   className="cursor-pointer"
                   onClick={() => openPlan(plan.id)}
                 >
-                  <TableCell className="font-medium">{plan.name}</TableCell>
-                  <TableCell>{plan.product?.name || "—"}</TableCell>
+                  <TableCell className="font-medium">{plan.product?.name || "—"}</TableCell>
                   <TableCell className="tabular-nums">
                     ₹{Number(plan.price).toFixed(2)}
                   </TableCell>
@@ -884,9 +841,6 @@ export default function RecurringPlansPage() {
                       {BILLING_PERIODS.find((b) => b.value === plan.billingPeriod)
                         ?.label || plan.billingPeriod}
                     </Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {plan.minimumQuantity}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-center gap-1.5">

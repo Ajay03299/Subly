@@ -25,7 +25,7 @@ interface Subscription {
   totalAmount: number;
   createdAt: string;
   recurringPlan?: {
-    name: string;
+    price: number;
     billingPeriod: string;
   } | null;
 }
@@ -163,7 +163,7 @@ export default function MyOrdersPage() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {sub.recurringPlan
-                        ? `${sub.recurringPlan.name} (${sub.recurringPlan.billingPeriod.toLowerCase()})`
+                        ? `₹${Number(sub.recurringPlan.price).toLocaleString()}/${sub.recurringPlan.billingPeriod.toLowerCase()}`
                         : "—"}
                     </TableCell>
                     <TableCell>

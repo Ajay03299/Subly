@@ -40,10 +40,8 @@ interface Tax {
 
 interface RecurringPlan {
   id?: string;
-  name: string;
   price: number;
   billingPeriod: string;
-  minimumQuantity: number;
   startDate: string;
   endDate?: string;
   autoClose: boolean;
@@ -73,10 +71,8 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
 
   // Recurring Plans management
   const [recurringPlans, setRecurringPlans] = useState<RecurringPlan[]>([]);
-  const [planName, setPlanName] = useState("");
   const [planPrice, setPlanPrice] = useState("");
   const [billingPeriod, setBillingPeriod] = useState("MONTHLY");
-  const [minimumQuantity, setMinimumQuantity] = useState("1");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [autoClose, setAutoClose] = useState(false);
@@ -148,16 +144,14 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
   };
 
   const addRecurringPlan = () => {
-    if (!planName || !planPrice || !billingPeriod || !startDate) {
+    if (!planPrice || !billingPeriod || !startDate) {
       setError("Please fill in all required recurring plan fields");
       return;
     }
 
     const newPlan: RecurringPlan = {
-      name: planName,
       price: parseFloat(planPrice),
       billingPeriod,
-      minimumQuantity: parseInt(minimumQuantity) || 1,
       startDate,
       endDate: endDate || undefined,
       autoClose,
@@ -167,10 +161,8 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
     };
 
     setRecurringPlans([...recurringPlans, newPlan]);
-    setPlanName("");
     setPlanPrice("");
     setBillingPeriod("MONTHLY");
-    setMinimumQuantity("1");
     setStartDate("");
     setEndDate("");
     setAutoClose(false);
@@ -519,16 +511,6 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-4 rounded-lg border border-dashed p-4">
-            <div className="space-y-2">
-              <Label htmlFor="planName">Plan Name</Label>
-              <Input
-                id="planName"
-                value={planName}
-                onChange={(e) => setPlanName(e.target.value)}
-                placeholder="e.g., Monthly Subscription"
-              />
-            </div>
-
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="planPrice">Plan Price</Label>
@@ -578,17 +560,6 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
                   onChange={(e) => setEndDate(e.target.value)}
                 />
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="minimumQuantity">Minimum Quantity</Label>
-              <Input
-                id="minimumQuantity"
-                type="number"
-                min="1"
-                value={minimumQuantity}
-                onChange={(e) => setMinimumQuantity(e.target.value)}
-              />
             </div>
 
             <div className="space-y-2">
@@ -661,8 +632,7 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
                       <Badge variant="outline" className="mr-2">
                         {plan.billingPeriod}
                       </Badge>
-                      <span className="text-sm font-medium">{plan.name}</span>
-                      <span className="ml-2 text-sm text-muted-foreground">
+                      <span className="ml-1 text-sm text-muted-foreground">
                         ₹{plan.price.toFixed(2)}
                       </span>
                     </div>

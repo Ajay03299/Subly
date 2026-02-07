@@ -49,10 +49,8 @@ interface Variant {
 
 interface RecurringPlan {
   id: string;
-  name: string;
   price: number;
   billingPeriod: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
-  minimumQuantity: number;
   closeable: boolean;
   renewable: boolean;
   pausable: boolean;
@@ -355,7 +353,7 @@ export default function ProductPage() {
                 >
                   {product.recurringPlans.map((plan) => (
                     <option key={plan.id} value={plan.id}>
-                      {plan.name} - ₹{plan.price}/{BILLING_PERIOD_LABELS[plan.billingPeriod]}
+                      ₹{plan.price}/{BILLING_PERIOD_LABELS[plan.billingPeriod]}
                     </option>
                   ))}
                 </select>
@@ -369,7 +367,7 @@ export default function ProductPage() {
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm font-semibold">
                   <CalendarDays className="h-4 w-4 text-primary" />
-                  Plan: {selectedPlanData.name}
+                  Plan: ₹{Number(selectedPlanData.price).toLocaleString()}/{BILLING_PERIOD_LABELS[selectedPlanData.billingPeriod].toLowerCase()}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -378,12 +376,6 @@ export default function ProductPage() {
                     <span className="text-muted-foreground">Billing:</span>{" "}
                     <span className="font-medium">
                       {BILLING_PERIOD_LABELS[selectedPlanData.billingPeriod]}
-                    </span>
-                  </span>
-                  <span>
-                    <span className="text-muted-foreground">Min Qty:</span>{" "}
-                    <span className="font-medium">
-                      {selectedPlanData.minimumQuantity}
                     </span>
                   </span>
                 </div>
@@ -506,10 +498,7 @@ export default function ProductPage() {
               <button
                 className="px-3 py-2.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                disabled={
-                  quantity <=
-                  (selectedPlanData?.minimumQuantity ?? 1)
-                }
+                disabled={quantity <= 1}
               >
                 <Minus className="h-4 w-4" />
               </button>
@@ -523,12 +512,6 @@ export default function ProductPage() {
                 <Plus className="h-4 w-4" />
               </button>
             </div>
-            {product.recurringPlans.length > 0 &&
-              product.recurringPlans[0].minimumQuantity > 1 && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Minimum quantity: {selectedPlanData?.minimumQuantity}
-                </p>
-              )}
           </div>
 
           {/* ── Price breakdown ──────────────────────────── */}

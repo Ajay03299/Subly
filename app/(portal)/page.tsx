@@ -42,7 +42,6 @@ interface Product {
   images: ProductImage[];
   recurringPlans?: Array<{
     id: string;
-    name: string;
     price: number;
     billingPeriod: string;
   }>;

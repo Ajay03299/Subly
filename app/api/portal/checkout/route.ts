@@ -256,7 +256,6 @@ export async function POST(request: NextRequest) {
         subscriptionNo,
         userId,
         paymentTerms: paymentTerms || "IMMEDIATE",
-        status: "CONFIRMED",
         discountCode: discountCode || null,
         discountAmount: appliedDiscountAmount,
         status: "ACTIVE",

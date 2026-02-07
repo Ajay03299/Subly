@@ -67,10 +67,8 @@ interface CreateFormPayload {
   };
   variants: Array<{ attribute: string; value: string; extraPrice: number }>;
   recurringPlans: Array<{
-    name: string;
     price: number;
     billingPeriod: string;
-    minimumQuantity: number;
     startDate: string;
     endDate?: string;
     autoClose: boolean;

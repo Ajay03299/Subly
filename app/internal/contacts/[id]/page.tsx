@@ -30,15 +30,15 @@ export default function ContactDetailPage() {
       setLoading(false);
       return;
     }
-    const c = data.contact as Contact;
-    setContact(c);
+    const c = data.contact as Contact & Record<string, unknown>;
+    setContact(c as Contact);
     setForm({
       name: c.name || "",
       email: c.email || "",
-      phone: c.phone || "",
-      a1: c.addressLine1 || "",
-      a2: c.addressLine2 || "",
-      a3: c.addressLine3 || "",
+      phone: (c.phone as string) || "",
+      a1: (c.addressLine1 as string) || "",
+      a2: (c.addressLine2 as string) || "",
+      a3: (c.addressLine3 as string) || "",
     });
     setLoading(false);
   }

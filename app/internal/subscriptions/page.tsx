@@ -417,7 +417,7 @@ export default function SubscriptionsPage() {
       s.subscriptionNo.toLowerCase().includes(q) ||
       s.user.email.toLowerCase().includes(q) ||
       s.status.toLowerCase().includes(q) ||
-      s.recurringPlan?.name?.toLowerCase().includes(q) ||
+      s.recurringPlan?.billingPeriod?.toLowerCase().includes(q) ||
       false
     );
   });
@@ -743,7 +743,7 @@ export default function SubscriptionsPage() {
                         <TableCell>
                           <span className="text-sm text-muted-foreground">
                             {sub.recurringPlan
-                              ? `${sub.recurringPlan.name} (${sub.recurringPlan.billingPeriod.toLowerCase()})`
+                              ? `₹${Number(sub.recurringPlan.price).toLocaleString()}/${sub.recurringPlan.billingPeriod.toLowerCase()}`
                               : "—"}
                           </span>
                         </TableCell>

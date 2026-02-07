@@ -54,17 +54,24 @@ interface Product {
   costPrice: number;
   recurringPlans?: Array<{
     id: string;
-    name: string;
     price: number;
     billingPeriod: string;
+    autoClose: boolean;
+    closeable: boolean;
+    renewable: boolean;
+    pausable: boolean;
   }>;
 }
 
 interface RecurringPlan {
   id: string;
-  name: string;
   price: number;
   billingPeriod: string;
+  autoClose: boolean;
+  closeable: boolean;
+  renewable: boolean;
+  pausable: boolean;
+  product?: { id: string; name: string };
 }
 
 interface Tax {
@@ -224,6 +231,36 @@ export function SubscriptionForm({
   const [recurringPlans, setRecurringPlans] = useState<RecurringPlan[]>([]);
   const [taxes, setTaxes] = useState<Tax[]>([]);
 
+  // Plan option filters (for filtering which products show in the dropdown)
+  const [filterAutoClose, setFilterAutoClose] = useState(false);
+  const [filterCloseable, setFilterCloseable] = useState(false);
+  const [filterPausable, setFilterPausable] = useState(false);
+  const [filterRenewable, setFilterRenewable] = useState(false);
+  const [filterPlanId, setFilterPlanId] = useState(""); // specific recurring plan
+
+  // Compute filtered products: only show products with plans matching active filters
+  const hasAnyFilter =
+    filterAutoClose || filterCloseable || filterPausable || filterRenewable || filterPlanId;
+
+  const filteredProducts = hasAnyFilter
+    ? products.filter((p) => {
+        if (!p.recurringPlans || p.recurringPlans.length === 0) return false;
+        // If a specific plan is selected, check that product has that plan
+        if (filterPlanId) {
+          const hasPlan = p.recurringPlans.some((rp) => rp.id === filterPlanId);
+          if (!hasPlan) return false;
+        }
+        // Check that at least one plan satisfies ALL selected option filters
+        return p.recurringPlans.some((rp) => {
+          if (filterAutoClose && !rp.autoClose) return false;
+          if (filterCloseable && !rp.closeable) return false;
+          if (filterPausable && !rp.pausable) return false;
+          if (filterRenewable && !rp.renewable) return false;
+          return true;
+        });
+      })
+    : products;
+
   // Inline line editor state
   const [newLineProductId, setNewLineProductId] = useState("");
   const [newLinePlanId, setNewLinePlanId] = useState("");
@@ -232,7 +269,9 @@ export function SubscriptionForm({
   const [newLineTaxRate, setNewLineTaxRate] = useState("0");
 
   // Recurring plans filtered by selected product
-  const selectedProduct = products.find((p) => p.id === newLineProductId);
+  const selectedProduct = filteredProducts.find(
+    (p) => p.id === newLineProductId
+  );
   const plansForProduct = selectedProduct?.recurringPlans ?? [];
 
   // Customer search
@@ -332,7 +371,7 @@ export function SubscriptionForm({
     const amount = qty * discounted * (1 + taxRate / 100);
 
     const planSuffix = selectedPlan
-      ? ` (${selectedPlan.name} — ${selectedPlan.billingPeriod.toLowerCase()})`
+      ? ` (₹${Number(selectedPlan.price).toFixed(2)}/${selectedPlan.billingPeriod.toLowerCase()})`
       : "";
 
     // Also set the subscription-level recurringPlanId if a plan was chosen
@@ -643,6 +682,81 @@ export function SubscriptionForm({
         </CardContent>
       </Card>
 
+      {/* ── Recurring Plans & Plan Options Filter ────────── */}
+      {!isReadOnly && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">
+              Recurring Plans &amp; Plan Options
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Specific Recurring Plan selector */}
+            <div className="space-y-1.5">
+              <Label className="text-sm">Recurring Plan</Label>
+              <Select
+                value={filterPlanId || "all"}
+                onValueChange={(v) => {
+                  setFilterPlanId(v === "all" ? "" : v);
+                  // Reset product selection when plan filter changes
+                  setNewLineProductId("");
+                  setNewLinePlanId("");
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All plans" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All plans</SelectItem>
+                  {recurringPlans.map((rp) => (
+                    <SelectItem key={rp.id} value={rp.id}>
+                      {rp.product?.name || "—"} — ₹{Number(rp.price).toFixed(2)}/{rp.billingPeriod.toLowerCase()}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Plan Options checkboxes */}
+            <div className="space-y-1.5">
+              <Label className="text-sm">Plan Options</Label>
+              <div className="flex flex-wrap gap-x-6 gap-y-2">
+                {([
+                  ["autoClose", "Auto-close", filterAutoClose, setFilterAutoClose],
+                  ["closeable", "Closable", filterCloseable, setFilterCloseable],
+                  ["pausable", "Pausable", filterPausable, setFilterPausable],
+                  ["renewable", "Renewable", filterRenewable, setFilterRenewable],
+                ] as const).map(([key, label, value, setter]) => (
+                  <label
+                    key={key}
+                    className="flex cursor-pointer items-center gap-2 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={value}
+                      onChange={(e) => {
+                        (setter as (v: boolean) => void)(e.target.checked);
+                        // Reset product selection when filters change
+                        setNewLineProductId("");
+                        setNewLinePlanId("");
+                      }}
+                      className="h-4 w-4 rounded border-border"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {hasAnyFilter && (
+              <p className="text-xs text-muted-foreground">
+                Showing {filteredProducts.length} of {products.length} products matching filters
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Tabs: Order Lines / Other Info ─────────────── */}
       <Tabs defaultValue="orderlines" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
@@ -673,7 +787,7 @@ export function SubscriptionForm({
                         <SelectItem value="placeholder" disabled>
                           Select product...
                         </SelectItem>
-                        {products.map((p) => (
+                        {filteredProducts.map((p) => (
                           <SelectItem key={p.id} value={p.id}>
                             {p.name} — ₹{Number(p.salesPrice).toFixed(2)}
                           </SelectItem>
@@ -709,7 +823,7 @@ export function SubscriptionForm({
                         </SelectItem>
                         {plansForProduct.map((plan) => (
                           <SelectItem key={plan.id} value={plan.id}>
-                            {plan.name} — ₹{Number(plan.price).toFixed(2)} /{" "}
+                            ₹{Number(plan.price).toFixed(2)} /{" "}
                             {plan.billingPeriod.toLowerCase()}
                           </SelectItem>
                         ))}

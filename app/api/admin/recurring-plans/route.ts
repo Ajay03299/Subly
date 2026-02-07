@@ -38,10 +38,8 @@ export async function POST(request: NextRequest) {
 
     const {
       productId,
-      name,
       price,
       billingPeriod,
-      minimumQuantity,
       autoClose,
       closeable,
       renewable,
@@ -51,9 +49,9 @@ export async function POST(request: NextRequest) {
     } = await request.json();
 
     // Validate required fields
-    if (!productId || !name || price === undefined || !billingPeriod || !startDate) {
+    if (!productId || price === undefined || !billingPeriod || !startDate) {
       return NextResponse.json(
-        { error: 'Missing required fields: productId, name, price, billingPeriod, startDate' },
+        { error: 'Missing required fields: productId, price, billingPeriod, startDate' },
         { status: 400 }
       );
     }
@@ -83,10 +81,8 @@ export async function POST(request: NextRequest) {
     const recurringPlan = await prisma.recurringPlan.create({
       data: {
         productId,
-        name,
         price: planPrice,
         billingPeriod,
-        minimumQuantity: minimumQuantity || 1,
         autoClose: autoClose || false,
         closeable: closeable !== false, // default true
         renewable: renewable !== false, // default true

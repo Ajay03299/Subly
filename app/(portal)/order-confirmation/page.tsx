@@ -159,7 +159,7 @@ function OrderConfirmationContent() {
       subscriptionNo: order.subscriptionNo,
       status: order.status,
       customerEmail: order.user?.email || "",
-      planName: order.recurringPlan?.name,
+      planName: order.recurringPlan ? `₹${Number(order.recurringPlan.price).toLocaleString()}/${order.recurringPlan.billingPeriod?.toLowerCase()}` : undefined,
       startDate: order.recurringPlan?.startDate,
       endDate: order.recurringPlan?.endDate,
       createdAt: order.createdAt,

@@ -12,9 +12,12 @@ export async function GET(request: NextRequest) {
         recurringPlans: {
           select: {
             id: true,
-            name: true,
             price: true,
             billingPeriod: true,
+            autoClose: true,
+            closeable: true,
+            renewable: true,
+            pausable: true,
           },
         },
       },

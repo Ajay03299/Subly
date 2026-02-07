@@ -208,8 +208,8 @@ export default function CartPage() {
                       ? "One-time"
                       : typeof item.plan === "string"
                         ? item.plan
-                        : item.plan?.name
-                          ? `${item.plan.name} (${item.plan.billingPeriod?.toLowerCase()})`
+                        : item.plan?.billingPeriod
+                          ? `₹${Number(item.plan.price).toLocaleString()}/${item.plan.billingPeriod.toLowerCase()}`
                           : "One-time";
                   const planPrice =
                     typeof item.plan === "string"

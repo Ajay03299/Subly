@@ -21,10 +21,8 @@ export interface ProductVariant {
 
 export interface RecurringPlanInfo {
   id: string;
-  name: string;
   billingPeriod: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
   price: number;
-  minimumQuantity: number;
   autoClose: boolean;
   closeable: boolean;
   renewable: boolean;

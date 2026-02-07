@@ -87,11 +87,8 @@ export async function PUT(
     return NextResponse.json({ error: "Plan not found" }, { status: 404 });
 
   const data: Record<string, unknown> = {};
-  if (body.name !== undefined) data.name = body.name;
   if (body.price !== undefined) data.price = parseFloat(body.price);
   if (body.billingPeriod !== undefined) data.billingPeriod = body.billingPeriod;
-  if (body.minimumQuantity !== undefined)
-    data.minimumQuantity = parseInt(body.minimumQuantity) || 1;
   if (body.autoClose !== undefined) data.autoClose = Boolean(body.autoClose);
   if (body.closeable !== undefined) data.closeable = Boolean(body.closeable);
   if (body.renewable !== undefined) data.renewable = Boolean(body.renewable);

@@ -175,15 +175,13 @@ model Variant {
 // ─────────────────────────────────────────────────────────
 
 model RecurringPlan {
-  id              String        @id @default(cuid())
-  productId       String
-  product         Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
-  name            String
-  price           Decimal       @db.Decimal(10, 2)
-  billingPeriod   BillingPeriod
-  minimumQuantity Int           @default(1)
-  startDate       DateTime
-  endDate         DateTime?
+  id            String        @id @default(cuid())
+  productId     String
+  product       Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  price         Decimal       @db.Decimal(10, 2)
+  billingPeriod BillingPeriod
+  startDate     DateTime
+  endDate       DateTime?
 
   // Plan options
   autoClose Boolean @default(false)

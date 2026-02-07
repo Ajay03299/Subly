@@ -266,7 +266,7 @@ export default function OrderDetailPage() {
       subscriptionNo: order.subscriptionNo,
       status: statusLabel(order.status),
       customerEmail: order.user.email,
-      planName: order.recurringPlan?.name,
+      planName: order.recurringPlan ? `₹${Number(order.recurringPlan.price).toLocaleString()}/${order.recurringPlan.billingPeriod?.toLowerCase()}` : undefined,
       startDate: order.recurringPlan?.startDate,
       endDate: order.recurringPlan?.endDate,
       createdAt: order.createdAt,
@@ -406,7 +406,9 @@ export default function OrderDetailPage() {
             <div>
               <span className="text-muted-foreground">Plan: </span>
               <span className="font-medium">
-                {order.recurringPlan?.name || "No recurring plan"}
+                {order.recurringPlan
+                  ? `₹${Number(order.recurringPlan.price).toLocaleString()}/${order.recurringPlan.billingPeriod?.toLowerCase()}`
+                  : "No recurring plan"}
               </span>
             </div>
             {order.recurringPlan && (

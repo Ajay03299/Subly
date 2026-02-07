@@ -9,14 +9,18 @@ export async function GET(request: NextRequest) {
         images: true,
         tax: true,
         tag: true,
-        recurringPlan: {
-          select: {
-            id: true,
-            billingPeriod: true,
-            autoClose: true,
-            closeable: true,
-            renewable: true,
-            pausable: true,
+        recurringPlanInfos: {
+          include: {
+            recurringPlan: {
+              select: {
+                id: true,
+                billingPeriod: true,
+                autoClose: true,
+                closeable: true,
+                renewable: true,
+                pausable: true,
+              },
+            },
           },
         },
       },

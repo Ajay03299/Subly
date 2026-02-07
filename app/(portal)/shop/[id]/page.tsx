@@ -56,6 +56,15 @@ interface RecurringPlan {
   autoClose: boolean;
 }
 
+interface RecurringPlanInfo {
+  id: string;
+  recurringPlanId: string;
+  price: number;
+  startDate: string;
+  endDate?: string | null;
+  recurringPlan: RecurringPlan;
+}
+
 interface Product {
   id: string;
   name: string;
@@ -66,7 +75,7 @@ interface Product {
   averageRating: number;
   images: ProductImage[];
   variants: Variant[];
-  recurringPlan: RecurringPlan | null;
+  recurringPlanInfos: RecurringPlanInfo[];
   tax?: { id: string; name: string; rate: number } | null;
 }
 
@@ -122,6 +131,9 @@ export default function ProductPage() {
 
   // Variant dropdown open state
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+
+  // Recurring plan selection
+  const [selectedPlanId, setSelectedPlanId] = useState<string>("");
 
   /* ── fetch product from api ─────────────────────────── */
   useEffect(() => {
@@ -179,10 +191,12 @@ export default function ProductPage() {
     );
   }
 
-  /* ── pricing ───────────────────────────────────────── */
-  const hasPlans = product.recurringPlan !== null;
-  const selectedPlanData = hasPlans ? product.recurringPlan : null;
-  const basePrice = Number(product.salesPrice);
+  const selectedPlanInfo = product.recurringPlanInfos.find(
+    (info) => info.recurringPlanId === selectedPlanId
+  );
+  const selectedPlanData = selectedPlanInfo?.recurringPlan || null;
+
+  const basePrice = selectedPlanInfo ? Number(selectedPlanInfo.price) : Number(product.salesPrice);
 
   const totalExtraPrice = Object.values(selectedVariants).reduce(
     (sum, v) => sum + v.extraPrice,
@@ -331,20 +345,21 @@ export default function ProductPage() {
           </div>
 
           {/* ── Recurring Plans dropdown ────────────── */}
-          {product.recurringPlans.length > 0 && (
+          {product.recurringPlanInfos.length > 0 && (
             <div>
               <label className="mb-2 block text-sm font-medium">
                 Billing Plan
               </label>
               <div className="relative">
                 <select
-                  value={selectedPlan || ""}
-                  onChange={(e) => setSelectedPlan(e.target.value)}
+                  value={selectedPlanId || ""}
+                  onChange={(e) => setSelectedPlanId(e.target.value)}
                   className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm transition-colors"
                 >
-                  {product.recurringPlans.map((plan) => (
-                    <option key={plan.id} value={plan.id}>
-                      {plan.name} - ₹{plan.price}/{BILLING_PERIOD_LABELS[plan.billingPeriod]}
+                  <option value="">Select a plan...</option>
+                  {product.recurringPlanInfos.map((info) => (
+                    <option key={info.id} value={info.recurringPlanId}>
+                      {info.recurringPlan.billingPeriod.toLowerCase()} - ₹{Number(info.price).toFixed(2)}
                     </option>
                   ))}
                 </select>
@@ -358,7 +373,7 @@ export default function ProductPage() {
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm font-semibold">
                   <CalendarDays className="h-4 w-4 text-primary" />
-                  Plan: {selectedPlanData.name}
+                  Plan: {selectedPlanData.billingPeriod.toLowerCase()}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">

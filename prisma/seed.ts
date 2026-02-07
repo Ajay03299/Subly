@@ -8,11 +8,6 @@ async function seed() {
       where: { email: 'admin@subly.com' },
     });
 
-    if (existingAdmin) {
-      console.log('Admin user already exists');
-      return;
-    }
-
     const hashedPassword = await bcryptjs.hash('admin123', 10); // Default password - change this!
 
     const adminUser = await prisma.user.createMany({
@@ -37,6 +32,28 @@ async function seed() {
             }
         ]
     });
+
+    await prisma.tax.createMany({
+        data: [
+            {
+                name: 'Standard VAT',
+                rate: 20.0,
+            },
+            {
+                name: 'Reduced VAT',
+                rate: 5.0,
+            }
+        ]
+    })
+
+    await prisma.productTag.createMany({
+        data: [
+            { name: 'SaaS' },
+            { name: 'E-commerce' },
+            { name: 'Education' },
+            { name: 'Entertainment' },
+        ]
+    })
 
   } catch (error) {
     console.error('Seeding error:', error);

@@ -39,14 +39,20 @@ interface Tax {
 }
 
 interface RecurringPlan {
-  id?: string;
+  id: string;
   billingPeriod: string;
-  startDate: string;
-  endDate?: string;
   autoClose: boolean;
   closeable: boolean;
   renewable: boolean;
   pausable: boolean;
+}
+
+interface RecurringPlanInfo {
+  recurringPlanId: string;
+  price: number;
+  startDate: string;
+  endDate?: string;
+  plan?: RecurringPlan; // Populated when fetching existing data
 }
 
 interface ProductFormProps {
@@ -62,14 +68,21 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
   const [description, setDescription] = useState("");
   const [tagId, setTagId] = useState("");
   const [tags, setTags] = useState<ProductTag[]>([]);
-    const [taxId, setTaxId] = useState("");
-    const [taxes, setTaxes] = useState<Tax[]>([]);
+  const [taxId, setTaxId] = useState("");
+  const [taxes, setTaxes] = useState<Tax[]>([]);
   const [images, setImages] = useState<ProductImage[]>([]);
   const [imageUrl, setImageUrl] = useState("");
   const [imageAlt, setImageAlt] = useState("");
 
-  // Recurring Plans are now managed separately - products link to plans
+  // Recurring Plans
   const [recurringPlans, setRecurringPlans] = useState<RecurringPlan[]>([]);
+  const [recurringPlanInfos, setRecurringPlanInfos] = useState<RecurringPlanInfo[]>([]);
+  const [selectedPlanId, setSelectedPlanId] = useState("");
+  const [planPrice, setPlanPrice] = useState("");
+  const [planStartDate, setPlanStartDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+  const [planEndDate, setPlanEndDate] = useState("");
 
   const [variants, setVariants] = useState<Variant[]>([]);
   const [variantAttribute, setVariantAttribute] = useState("");
@@ -105,10 +118,22 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
         // silent
       }
     };
-
+    const fetchRecurringPlans = async () => {
+      try {
+        const res = await fetch("/api/admin/recurring-plans", {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setRecurringPlans(data.plans || []);
+      } catch {
+        // silent
+      }
+    };
 
     fetchTags();
     fetchTaxes();
+    fetchRecurringPlans();
   }, []);
 
   const addVariant = () => {
@@ -134,13 +159,42 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
     setVariants(variants.filter((_, i) => i !== index));
   };
 
-  const addRecurringPlan = () => {
-    // Recurring plans are now managed separately in /internal/configuration/recurring-plans
-    setError("Recurring plans are now managed separately. Please go to Configuration > Recurring Plans.");
+  const addRecurringPlanInfo = () => {
+    if (!selectedPlanId || !planPrice || !planStartDate) {
+      setError("Please select a plan, enter a price, and set a start date");
+      return;
+    }
+
+    // Check if this plan is already added
+    if (recurringPlanInfos.some(info => info.recurringPlanId === selectedPlanId)) {
+      setError("This plan has already been added");
+      return;
+    }
+
+    const plan = recurringPlans.find(p => p.id === selectedPlanId);
+    if (!plan) {
+      setError("Plan not found");
+      return;
+    }
+
+    const newInfo: RecurringPlanInfo = {
+      recurringPlanId: selectedPlanId,
+      price: parseFloat(planPrice),
+      startDate: planStartDate,
+      endDate: planEndDate || undefined,
+      plan,
+    };
+
+    setRecurringPlanInfos([...recurringPlanInfos, newInfo]);
+    setSelectedPlanId("");
+    setPlanPrice("");
+    setPlanStartDate(new Date().toISOString().split("T")[0]);
+    setPlanEndDate("");
+    setError(null);
   };
 
-  const removeRecurringPlan = (index: number) => {
-    setRecurringPlans(recurringPlans.filter((_, i) => i !== index));
+  const removeRecurringPlanInfo = (index: number) => {
+    setRecurringPlanInfos(recurringPlanInfos.filter((_, i) => i !== index));
   };
 
   const addImage = () => {
@@ -183,11 +237,11 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
           costPrice: parseFloat(costPrice),
           description: description || null,
           tagId: tagId || null,
-                    taxId: taxId || null,
+          taxId: taxId || null,
           images,
         },
         variants,
-        recurringPlans,
+        recurringPlanInfos,
       };
 
       await onSubmit(formData);
@@ -471,16 +525,38 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
         </CardContent>
       </Card>
 
-      {/* Recurring Plans Note */}
+      {/* Recurring Plans Card */}
       <Card>
         <CardHeader>
-          <CardTitle>Recurring Plans</CardTitle>
+          <CardTitle>Recurring Plans (Optional)</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-4 rounded-lg border border-dashed p-4">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="planPrice">Plan Price</Label>
+                <Label htmlFor="selectedPlanId">Recurring Plan *</Label>
+                <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
+                  <SelectTrigger id="selectedPlanId">
+                    <SelectValue placeholder="Select a recurring plan" />
+                  </SelectTrigger>
+                  <SelectContent position="popper">
+                    {recurringPlans.length === 0 ? (
+                      <SelectItem value="no-plans" disabled>
+                        No recurring plans available
+                      </SelectItem>
+                    ) : (
+                      recurringPlans.map((plan) => (
+                        <SelectItem key={plan.id} value={plan.id}>
+                          {plan.billingPeriod}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="planPrice">Price for this Plan *</Label>
                 <Input
                   id="planPrice"
                   type="number"
@@ -490,90 +566,35 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
                   placeholder="0.00"
                 />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="billingPeriod">Billing Period</Label>
-                <Select value={billingPeriod} onValueChange={setBillingPeriod}>
-                  <SelectTrigger id="billingPeriod">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="DAILY">Daily</SelectItem>
-                    <SelectItem value="WEEKLY">Weekly</SelectItem>
-                    <SelectItem value="MONTHLY">Monthly</SelectItem>
-                    <SelectItem value="YEARLY">Yearly</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="startDate">Start Date</Label>
+                <Label htmlFor="planStartDate">Start Date *</Label>
                 <Input
-                  id="startDate"
+                  id="planStartDate"
                   type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  value={planStartDate}
+                  onChange={(e) => setPlanStartDate(e.target.value)}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="endDate">End Date (Optional)</Label>
+                <Label htmlFor="planEndDate">
+                  End Date <span className="text-xs text-muted-foreground">(optional)</span>
+                </Label>
                 <Input
-                  id="endDate"
+                  id="planEndDate"
                   type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  value={planEndDate}
+                  onChange={(e) => setPlanEndDate(e.target.value)}
                 />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Plan Options</Label>
-              <div className="flex flex-wrap gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={autoClose}
-                    onChange={(e) => setAutoClose(e.target.checked)}
-                    className="h-4 w-4 rounded"
-                  />
-                  <span className="text-sm">Auto Close</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={closeable}
-                    onChange={(e) => setCloseable(e.target.checked)}
-                    className="h-4 w-4 rounded"
-                  />
-                  <span className="text-sm">Closeable</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={renewable}
-                    onChange={(e) => setRenewable(e.target.checked)}
-                    className="h-4 w-4 rounded"
-                  />
-                  <span className="text-sm">Renewable</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={pausable}
-                    onChange={(e) => setPausable(e.target.checked)}
-                    className="h-4 w-4 rounded"
-                  />
-                  <span className="text-sm">Pausable</span>
-                </label>
               </div>
             </div>
 
             <Button
               type="button"
-              onClick={addRecurringPlan}
+              onClick={addRecurringPlanInfo}
               variant="outline"
               size="sm"
               className="w-full gap-2"
@@ -583,26 +604,42 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
             </Button>
           </div>
 
-          {/* List of added recurring plans */}
-          {recurringPlans.length > 0 && (
+          {/* List of added recurring plan infos */}
+          {recurringPlanInfos.length > 0 && (
             <div className="mt-4 space-y-2">
               <Label className="text-base font-semibold">
-                Associated Plans ({recurringPlans.length})
+                Associated Plans ({recurringPlanInfos.length})
               </Label>
               <div className="space-y-2">
-                {recurringPlans.map((plan, index) => (
+                {recurringPlanInfos.map((info, index) => (
                   <div
                     key={index}
                     className="flex items-center justify-between rounded-lg border border-border bg-muted/50 p-3"
                   >
-                    <div>
-                      <Badge variant="outline" className="mr-2">
-                        {plan.billingPeriod}
+                    <div className="flex flex-col">
+                      <Badge variant="outline" className="mb-1 w-fit">
+                        {info.plan?.billingPeriod}
                       </Badge>
-                      <span className="ml-1 text-sm text-muted-foreground">
-                        ₹{plan.price.toFixed(2)}
+                      <span className="text-sm text-muted-foreground">
+                        Price: ₹{info.price.toFixed(2)}
                       </span>
+                      <span className="text-xs text-muted-foreground">
+                        From: {new Date(info.startDate).toLocaleDateString()}
+                      </span>
+                      {info.endDate && (
+                        <span className="text-xs text-muted-foreground">
+                          Until: {new Date(info.endDate).toLocaleDateString()}
+                        </span>
+                      )}
                     </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeRecurringPlanInfo(index)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
                 ))}
               </div>

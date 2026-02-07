@@ -71,6 +71,14 @@ interface PlanSubscription {
   user?: { email: string };
 }
 
+interface RecurringPlanInfo {
+  id: string;
+  price: number;
+  startDate: string | null;
+  endDate: string | null;
+  product: PlanProduct;
+}
+
 interface RecurringPlan {
   id: string;
   billingPeriod: string;
@@ -78,10 +86,8 @@ interface RecurringPlan {
   closeable: boolean;
   renewable: boolean;
   pausable: boolean;
-  startDate: string;
-  endDate: string | null;
   createdAt: string;
-  products?: PlanProduct[];
+  recurringPlanInfos?: RecurringPlanInfo[];
   subscriptions?: PlanSubscription[];
 }
 
@@ -151,10 +157,6 @@ export default function RecurringPlansPage() {
   const [formCloseable, setFormCloseable] = useState(true);
   const [formRenewable, setFormRenewable] = useState(true);
   const [formPausable, setFormPausable] = useState(false);
-  const [formStartDate, setFormStartDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
-  const [formEndDate, setFormEndDate] = useState("");
 
   /* ── fetch plans ────────────────────────────────────── */
   const fetchPlans = useCallback(async () => {
@@ -222,12 +224,6 @@ export default function RecurringPlansPage() {
     setFormCloseable(plan.closeable);
     setFormRenewable(plan.renewable);
     setFormPausable(plan.pausable);
-    setFormStartDate(
-      plan.startDate ? new Date(plan.startDate).toISOString().split("T")[0] : ""
-    );
-    setFormEndDate(
-      plan.endDate ? new Date(plan.endDate).toISOString().split("T")[0] : ""
-    );
   }
 
   function resetForm() {
@@ -236,8 +232,6 @@ export default function RecurringPlansPage() {
     setFormCloseable(true);
     setFormRenewable(true);
     setFormPausable(false);
-    setFormStartDate(new Date().toISOString().split("T")[0]);
-    setFormEndDate("");
   }
 
   /* ── initial fetch ──────────────────────────────────── */
@@ -280,8 +274,6 @@ export default function RecurringPlansPage() {
       closeable: formCloseable,
       renewable: formRenewable,
       pausable: formPausable,
-      startDate: formStartDate || new Date().toISOString(),
-      endDate: formEndDate || null,
     };
 
     try {
@@ -367,7 +359,7 @@ export default function RecurringPlansPage() {
   const filtered = plans.filter(
     (p) =>
       p.billingPeriod.toLowerCase().includes(search.toLowerCase()) ||
-      p.products?.some((prod) => prod.name.toLowerCase().includes(search.toLowerCase()))
+      p.recurringPlanInfos?.some((info) => info.product.name.toLowerCase().includes(search.toLowerCase()))
   );
 
   const isDetail = view !== "list" && view !== "create";
@@ -392,8 +384,8 @@ export default function RecurringPlansPage() {
             </h1>
             {!isCreate && activePlan && (
               <p className="text-sm text-muted-foreground">
-                {activePlan.products && activePlan.products.length > 0
-                  ? `${activePlan.products.length} product${activePlan.products.length !== 1 ? 's' : ''}`
+                {activePlan.recurringPlanInfos && activePlan.recurringPlanInfos.length > 0
+                  ? `${activePlan.recurringPlanInfos.length} product${activePlan.recurringPlanInfos.length !== 1 ? 's' : ''}`
                   : 'No products'} &middot;{" "}
                 {BILLING_PERIODS.find(
                   (b) => b.value === activePlan.billingPeriod
@@ -446,31 +438,6 @@ export default function RecurringPlansPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-
-                {/* Start Date */}
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Start Date</label>
-                  <Input
-                    type="date"
-                    value={formStartDate}
-                    onChange={(e) => setFormStartDate(e.target.value)}
-                  />
-                </div>
-
-                {/* End Date */}
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">
-                    End Date{" "}
-                    <span className="text-xs text-muted-foreground">
-                      (optional)
-                    </span>
-                  </label>
-                  <Input
-                    type="date"
-                    value={formEndDate}
-                    onChange={(e) => setFormEndDate(e.target.value)}
-                  />
                 </div>
 
                 {/* ── Checkboxes ────────────────────────── */}
@@ -540,12 +507,12 @@ export default function RecurringPlansPage() {
             </div>
 
             {/* ── Product Info ────────────────────────────── */}
-            {isDetail && activePlan?.products && activePlan.products.length > 0 && (
+            {isDetail && activePlan?.recurringPlanInfos && activePlan.recurringPlanInfos.length > 0 && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-base">
                     <Package className="h-4 w-4" />
-                    Products ({activePlan.products.length})
+                    Products ({activePlan.recurringPlanInfos.length})
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -555,35 +522,43 @@ export default function RecurringPlansPage() {
                         <TableHead>Product</TableHead>
                         <TableHead>Type</TableHead>
                         <TableHead>Variant</TableHead>
-                        <TableHead className="text-right">Product Price</TableHead>
+                        <TableHead className="text-right">Plan Price</TableHead>
+                        <TableHead>Start Date</TableHead>
+                        <TableHead>End Date</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {activePlan.products.map((product) => (
+                      {activePlan.recurringPlanInfos.map((info) => (
                         <>
                           {/* Main product row */}
-                          <TableRow key={product.id}>
+                          <TableRow key={info.id}>
                             <TableCell className="font-medium">
-                              {product.name}
+                              {info.product.name}
                             </TableCell>
                             <TableCell>
-                              <Badge variant="outline">{product.type}</Badge>
+                              <Badge variant="outline">{info.product.type}</Badge>
                             </TableCell>
                             <TableCell className="text-muted-foreground">
                               —
                             </TableCell>
                             <TableCell className="text-right">
-                              ₹{Number(product.salesPrice).toFixed(2)} /{" "}
+                              ₹{Number(info.price).toFixed(2)} /{" "}
                               {BILLING_PERIODS.find(
                                 (b) => b.value === activePlan.billingPeriod
                               )?.label.toLowerCase() || "period"}
                             </TableCell>
+                            <TableCell>
+                              {info.startDate ? new Date(info.startDate).toLocaleDateString() : "—"}
+                            </TableCell>
+                            <TableCell>
+                              {info.endDate ? new Date(info.endDate).toLocaleDateString() : "—"}
+                            </TableCell>
                           </TableRow>
                           {/* Variant rows */}
-                          {product.variants?.map((v) => (
+                          {info.product.variants?.map((v) => (
                             <TableRow key={v.id}>
                               <TableCell className="text-muted-foreground pl-8">
-                                {product.name}
+                                {info.product.name}
                               </TableCell>
                               <TableCell></TableCell>
                               <TableCell>
@@ -592,10 +567,16 @@ export default function RecurringPlansPage() {
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-right">
-                                ₹{(Number(product.salesPrice) + Number(v.extraPrice)).toFixed(2)} /{" "}
+                                ₹{(Number(info.price) + Number(v.extraPrice)).toFixed(2)} /{" "}
                                 {BILLING_PERIODS.find(
                                   (b) => b.value === activePlan.billingPeriod
                                 )?.label.toLowerCase() || "period"}
+                              </TableCell>
+                              <TableCell>
+                                {info.startDate ? new Date(info.startDate).toLocaleDateString() : "—"}
+                              </TableCell>
+                              <TableCell>
+                                {info.endDate ? new Date(info.endDate).toLocaleDateString() : "—"}
                               </TableCell>
                             </TableRow>
                           ))}
@@ -607,7 +588,7 @@ export default function RecurringPlansPage() {
               </Card>
             )}
 
-            {isDetail && (!activePlan?.products || activePlan.products.length === 0) && (
+            {isDetail && (!activePlan?.recurringPlanInfos || activePlan.recurringPlanInfos.length === 0) && (
               <Card>
                 <CardContent className="py-8 text-center text-sm text-muted-foreground">
                   <Package className="mx-auto mb-2 h-8 w-8 opacity-40" />
@@ -776,8 +757,8 @@ export default function RecurringPlansPage() {
                   onClick={() => openPlan(plan.id)}
                 >
                   <TableCell className="font-medium">
-                    {plan.products && plan.products.length > 0 
-                      ? plan.products.map(p => p.name).join(", ")
+                    {plan.recurringPlanInfos && plan.recurringPlanInfos.length > 0 
+                      ? plan.recurringPlanInfos.map(info => info.product.name).join(", ")
                       : "No products"}
                   </TableCell>
                   <TableCell>

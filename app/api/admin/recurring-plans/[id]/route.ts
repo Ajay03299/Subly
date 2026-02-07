@@ -41,13 +41,17 @@ export async function GET(
   const plan = await prisma.recurringPlan.findUnique({
     where: { id },
     include: {
-      products: {
-        select: {
-          id: true,
-          name: true,
-          type: true,
-          salesPrice: true,
-          variants: { select: { id: true, attribute: true, value: true, extraPrice: true } },
+      recurringPlanInfos: {
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+              salesPrice: true,
+              variants: { select: { id: true, attribute: true, value: true, extraPrice: true } },
+            },
+          },
         },
       },
       subscriptions: {
@@ -92,15 +96,16 @@ export async function PUT(
   if (body.closeable !== undefined) data.closeable = Boolean(body.closeable);
   if (body.renewable !== undefined) data.renewable = Boolean(body.renewable);
   if (body.pausable !== undefined) data.pausable = Boolean(body.pausable);
-  if (body.startDate !== undefined) data.startDate = new Date(body.startDate);
-  if (body.endDate !== undefined)
-    data.endDate = body.endDate ? new Date(body.endDate) : null;
 
   const updated = await prisma.recurringPlan.update({
     where: { id },
     data,
     include: {
-      products: { select: { id: true, name: true, type: true, salesPrice: true } },
+      recurringPlanInfos: {
+        include: {
+          product: { select: { id: true, name: true, type: true, salesPrice: true } },
+        },
+      },
       subscriptions: {
         select: {
           id: true,

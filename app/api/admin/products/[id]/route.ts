@@ -45,7 +45,11 @@ export async function GET(
       where: { id },
       include: {
         variants: true,
-        recurringPlans: true,
+        recurringPlanInfos: {
+          include: {
+            recurringPlan: true,
+          },
+        },
       },
     });
 
@@ -82,8 +86,15 @@ export async function PUT(
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    const { name, type, salesPrice, costPrice } =
+    const { name, type, salesPrice, costPrice, recurringPlanInfos } =
       await request.json();
+
+    // If updating recurring plan infos, delete old ones and create new ones
+    if (recurringPlanInfos !== undefined) {
+      await prisma.recurringPlanInfo.deleteMany({
+        where: { productId: id },
+      });
+    }
 
     const product = await prisma.product.update({
       where: { id },
@@ -96,8 +107,27 @@ export async function PUT(
         ...(costPrice !== undefined && {
           costPrice: parseFloat(costPrice),
         }),
+        ...(recurringPlanInfos !== undefined && {
+          recurringPlanInfos: {
+            create: Array.isArray(recurringPlanInfos)
+              ? recurringPlanInfos.map((info: any) => ({
+                  recurringPlanId: info.recurringPlanId,
+                  price: parseFloat(info.price),
+                  startDate: new Date(info.startDate),
+                  endDate: info.endDate ? new Date(info.endDate) : null,
+                }))
+              : [],
+          },
+        }),
       },
-      include: { variants: true, recurringPlans: true },
+      include: {
+        variants: true,
+        recurringPlanInfos: {
+          include: {
+            recurringPlan: true,
+          },
+        },
+      },
     });
 
     return NextResponse.json(

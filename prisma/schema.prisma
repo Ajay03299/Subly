@@ -112,13 +112,12 @@ model Product {
   costPrice        Decimal     @db.Decimal(10, 2)
   tagId            String?
   taxId            String? // Tax bracket this product belongs to
-  recurringPlanId  String?
   averageRating    Decimal     @default(0) @db.Decimal(3, 2) // 0-5 rating
 
   variants               Variant[]
   tag                    ProductTag?             @relation(fields: [tagId], references: [id])
   tax                    Tax?                    @relation(fields: [taxId], references: [id])
-  recurringPlan          RecurringPlan?          @relation(fields: [recurringPlanId], references: [id])
+  recurringPlanInfos     RecurringPlanInfo[]
   images                 ProductImage[]
   subscriptionLines      SubscriptionLine[]
   invoiceLines           InvoiceLine[]
@@ -171,15 +170,9 @@ model Variant {
   @@map("variants")
 }
 
-// ─────────────────────────────────────────────────────────
-//  Recurring Plan
-// ─────────────────────────────────────────────────────────
-
 model RecurringPlan {
   id            String        @id @default(cuid())
   billingPeriod BillingPeriod
-  startDate     DateTime
-  endDate       DateTime?
 
   // Plan options
   autoClose Boolean @default(false)
@@ -187,7 +180,7 @@ model RecurringPlan {
   renewable Boolean @default(true)
   pausable  Boolean @default(false)
 
-  products           Product[]
+  recurringPlanInfos RecurringPlanInfo[]
   subscriptions      Subscription[]
   quotationTemplates QuotationTemplate[]
 
@@ -197,9 +190,28 @@ model RecurringPlan {
   @@map("recurring_plans")
 }
 
-// ─────────────────────────────────────────────────────────
-//  Subscription & Order Lines
-// ─────────────────────────────────────────────────────────
+// Junction table: connects Product to RecurringPlan with price for that specific plan
+model RecurringPlanInfo {
+  id String @id @default(cuid())
+
+  productId     String
+  product       Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  recurringPlanId String
+  recurringPlan   RecurringPlan @relation(fields: [recurringPlanId], references: [id], onDelete: Cascade)
+
+  price     Decimal   @db.Decimal(10, 2) // Price for this product on this recurring plan
+  startDate DateTime // When this plan becomes available for this product
+  endDate   DateTime? // When this plan expires for this product (optional)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, recurringPlanId]) // Prevent duplicate plan-product combinations
+  @@index([productId])
+  @@index([recurringPlanId])
+  @@map("recurring_plan_infos")
+}
 
 model Subscription {
   id             String @id @default(cuid())
@@ -236,8 +248,6 @@ model Subscription {
   @@map("subscriptions")
 }
 
-/// One line item per product in a subscription (Order Lines).
-/// amount = quantity * unitPrice * (1 + taxRate / 100)
 model SubscriptionLine {
   id String @id @default(cuid())
 
@@ -265,9 +275,6 @@ model SubscriptionLine {
   @@index([productId])
   @@map("subscription_lines")
 }
-
-//  Quotation Templates (predefined setups for quick sub creation)
-// ─────────────────────────────────────────────────────────
 
 model QuotationTemplate {
   id           String @id @default(cuid())
@@ -302,10 +309,6 @@ model QuotationTemplateLine {
   @@index([templateId])
   @@map("quotation_template_lines")
 }
-
-// ─────────────────────────────────────────────────────────
-//  Tax  (configurable — default rate loaded from env at app layer)
-// ─────────────────────────────────────────────────────────
 
 model Tax {
   id                String             @id @default(cuid())

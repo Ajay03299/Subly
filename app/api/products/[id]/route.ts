@@ -15,7 +15,11 @@ export async function GET(
         tag: true,
         tax: true,
         variants: true,
-        recurringPlan: true,
+        recurringPlanInfos: {
+          include: {
+            recurringPlan: true,
+          },
+        },
       },
     });
 

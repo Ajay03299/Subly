@@ -36,6 +36,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const requestBody = await request.json();
+    
+    // Handle both nested and flat data structures
+    const product = requestBody.product || requestBody;
+    const variants = requestBody.variants || [];
+    const recurringPlanInfos = requestBody.recurringPlanInfos || [];
+
     const {
       name,
       type,
@@ -43,9 +50,9 @@ export async function POST(request: NextRequest) {
       costPrice,
       description,
       tagId,
-        taxId,
+      taxId,
       images,
-    } = await request.json();
+    } = product;
 
     // Validate required fields
     if (!name || !type || salesPrice === undefined || costPrice === undefined) {
@@ -66,8 +73,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create product
-    const product = await prisma.product.create({
+    // Create product with variants and recurring plan infos
+    const createdProduct = await prisma.product.create({
       data: {
         name,
         type,
@@ -75,19 +82,38 @@ export async function POST(request: NextRequest) {
         costPrice: cost,
         description: description || null,
         tag: tagId ? { connect: { id: tagId } } : undefined,
-          tax: taxId ? { connect: { id: taxId } } : undefined,
+        tax: taxId ? { connect: { id: taxId } } : undefined,
         images: {
           create: images && Array.isArray(images) ? images.map((img: any) => ({
             url: img.url,
             alt: img.alt || null,
           })) : [],
         },
+        variants: {
+          create: variants && Array.isArray(variants) ? variants.map((v: any) => ({
+            attribute: v.attribute,
+            value: v.value,
+            extraPrice: parseFloat(v.extraPrice || 0),
+          })) : [],
+        },
+        recurringPlanInfos: {
+          create: recurringPlanInfos && Array.isArray(recurringPlanInfos) ? recurringPlanInfos.map((info: any) => ({
+            recurringPlanId: info.recurringPlanId,
+            price: parseFloat(info.price),
+            startDate: new Date(info.startDate),
+            endDate: info.endDate ? new Date(info.endDate) : null,
+          })) : [],
+        },
       },
       include: {
         variants: true,
-        recurringPlan: true,
+        recurringPlanInfos: {
+          include: {
+            recurringPlan: true,
+          },
+        },
         tag: true,
-          tax: true,
+        tax: true,
         images: true,
       },
     });
@@ -95,7 +121,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         message: 'Product created successfully',
-        product,
+        product: createdProduct,
       },
       { status: 201 }
     );
@@ -133,7 +159,11 @@ export async function GET(request: NextRequest) {
     const products = await prisma.product.findMany({
       include: {
         variants: true,
-        recurringPlan: true,
+        recurringPlanInfos: {
+          include: {
+            recurringPlan: true,
+          },
+        },
         tag: true,
         images: true,
       },

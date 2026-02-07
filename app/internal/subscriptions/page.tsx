@@ -49,9 +49,11 @@ interface Subscription {
   recurringPlanId: string | null;
   recurringPlan: {
     id: string;
-    name: string;
-    price: number;
     billingPeriod: string;
+    autoClose: boolean;
+    closeable: boolean;
+    renewable: boolean;
+    pausable: boolean;
   } | null;
   paymentTerms: string | null;
   status: SubStatus;
@@ -61,7 +63,7 @@ interface Subscription {
   lines: Array<{
     id: string;
     productId: string;
-    product: { id: string; name: string; salesPrice: number };
+    product: { id: string; name: string; salesPrice: number; type: string; costPrice: number };
     quantity: number;
     unitPrice: number;
     taxRate: number;

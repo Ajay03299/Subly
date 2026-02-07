@@ -52,14 +52,20 @@ interface Product {
   type: string;
   salesPrice: number;
   costPrice: number;
-  recurringPlans?: Array<{
+  recurringPlanInfos?: Array<{
     id: string;
+    recurringPlanId: string;
     price: number;
-    billingPeriod: string;
-    autoClose: boolean;
-    closeable: boolean;
-    renewable: boolean;
-    pausable: boolean;
+    startDate: string;
+    endDate?: string | null;
+    recurringPlan: {
+      id: string;
+      billingPeriod: string;
+      autoClose: boolean;
+      closeable: boolean;
+      renewable: boolean;
+      pausable: boolean;
+    };
   }>;
 }
 
@@ -243,14 +249,17 @@ export function SubscriptionForm({
 
   const filteredProducts = hasAnyFilter
     ? products.filter((p) => {
-        if (!p.recurringPlans || p.recurringPlans.length === 0) return false;
+        if (!p.recurringPlanInfos || p.recurringPlanInfos.length === 0) return false;
         // If a specific plan is selected, check that product has that plan
         if (filterPlanId) {
-          const hasPlan = p.recurringPlans.some((rp) => rp.id === filterPlanId);
+          const hasPlan = p.recurringPlanInfos.some(
+            (info) => info.recurringPlan.id === filterPlanId
+          );
           if (!hasPlan) return false;
         }
         // Check that at least one plan satisfies ALL selected option filters
-        return p.recurringPlans.some((rp) => {
+        return p.recurringPlanInfos.some((info) => {
+          const rp = info.recurringPlan;
           if (filterAutoClose && !rp.autoClose) return false;
           if (filterCloseable && !rp.closeable) return false;
           if (filterPausable && !rp.pausable) return false;
@@ -271,7 +280,7 @@ export function SubscriptionForm({
   const selectedProduct = filteredProducts.find(
     (p) => p.id === newLineProductId
   );
-  const plansForProduct = selectedProduct?.recurringPlans ?? [];
+  const plansForProduct = selectedProduct?.recurringPlanInfos ?? [];
 
   // Customer search
   const [customerSearch, setCustomerSearch] = useState(
@@ -360,22 +369,22 @@ export function SubscriptionForm({
     const product = products.find((p) => p.id === newLineProductId);
     if (!product) return;
 
-    // Use product salesPrice (plan no longer has price)
-    const selectedPlan = plansForProduct.find((p) => p.id === newLinePlanId);
+    // Use plan's price for pricing
+    const selectedPlanInfo = plansForProduct.find((p) => p.recurringPlanId === newLinePlanId);
     const qty = parseInt(newLineQty) || 1;
-    const price = Number(product.salesPrice);
+    const price = selectedPlanInfo ? Number(selectedPlanInfo.price) : Number(product.salesPrice);
     const discount = parseFloat(newLineDiscount) || 0;
     const taxRate = parseFloat(newLineTaxRate) || 0;
     const discounted = price * (1 - discount / 100);
     const amount = qty * discounted * (1 + taxRate / 100);
 
-    const planSuffix = selectedPlan
-      ? ` (Plan — ${selectedPlan.billingPeriod.toLowerCase()})`
+    const planSuffix = selectedPlanInfo
+      ? ` (Plan — ${selectedPlanInfo.recurringPlan.billingPeriod.toLowerCase()})`
       : "";
 
     // Also set the subscription-level recurringPlanId if a plan was chosen
-    if (selectedPlan) {
-      setRecurringPlanId(selectedPlan.id);
+    if (selectedPlanInfo) {
+      setRecurringPlanId(selectedPlanInfo.recurringPlanId);
     }
 
     setLines([
@@ -709,7 +718,7 @@ export function SubscriptionForm({
                   <SelectItem value="all">All plans</SelectItem>
                   {recurringPlans.map((rp) => (
                     <SelectItem key={rp.id} value={rp.id}>
-                      {rp.product?.name || "—"} — ₹{Number(rp.price).toFixed(2)}/{rp.billingPeriod.toLowerCase()}
+                      {rp.billingPeriod.toLowerCase()}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -820,9 +829,9 @@ export function SubscriptionForm({
                         <SelectItem value="none">
                           No plan (use sales price)
                         </SelectItem>
-                        {plansForProduct.map((plan) => (
-                          <SelectItem key={plan.id} value={plan.id}>
-                            Plan — {plan.billingPeriod.toLowerCase()}
+                        {plansForProduct.map((info) => (
+                          <SelectItem key={info.id} value={info.recurringPlanId}>
+                            {info.recurringPlan.billingPeriod.toLowerCase()} — ₹{Number(info.price).toFixed(2)}
                           </SelectItem>
                         ))}
                       </SelectContent>

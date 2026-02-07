@@ -42,14 +42,12 @@ export async function POST(request: NextRequest) {
       closeable,
       renewable,
       pausable,
-      startDate,
-      endDate,
     } = await request.json();
 
     // Validate required fields
-    if (!billingPeriod || !startDate) {
+    if (!billingPeriod) {
       return NextResponse.json(
-        { error: 'Missing required fields: billingPeriod, startDate' },
+        { error: 'Missing required field: billingPeriod' },
         { status: 400 }
       );
     }
@@ -62,8 +60,6 @@ export async function POST(request: NextRequest) {
         closeable: closeable !== false, // default true
         renewable: renewable !== false, // default true
         pausable: pausable || false,
-        startDate: new Date(startDate),
-        endDate: endDate ? new Date(endDate) : null,
       },
     });
 
@@ -107,7 +103,11 @@ export async function GET(request: NextRequest) {
     // Fetch all recurring plans with relations
     const plans = await prisma.recurringPlan.findMany({
       include: {
-        products: { select: { id: true, name: true, type: true, salesPrice: true } },
+        recurringPlanInfos: {
+          include: {
+            product: { select: { id: true, name: true, type: true, salesPrice: true } },
+          },
+        },
         subscriptions: {
           select: { id: true, subscriptionNo: true, status: true, totalAmount: true },
           take: 50,

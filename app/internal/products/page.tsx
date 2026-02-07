@@ -42,11 +42,19 @@ interface Product {
   type: string;
   salesPrice: number;
   costPrice: number;
-  recurringPlans?: Array<{
+  recurringPlanInfos?: Array<{
     id: string;
-    name: string;
     price: number;
-    billingPeriod: string;
+    startDate: string;
+    endDate?: string | null;
+    recurringPlan: {
+      id: string;
+      billingPeriod: string;
+      autoClose: boolean;
+      closeable: boolean;
+      renewable: boolean;
+      pausable: boolean;
+    };
   }>;
   variants: Array<{
     id: string;
@@ -64,17 +72,17 @@ interface CreateFormPayload {
     type: string;
     salesPrice: number;
     costPrice: number;
+    description?: string | null;
+    tagId?: string | null;
+    taxId?: string | null;
+    images?: Array<{ url: string; alt?: string }>;
   };
   variants: Array<{ attribute: string; value: string; extraPrice: number }>;
-  recurringPlans: Array<{
+  recurringPlanInfos: Array<{
+    recurringPlanId: string;
     price: number;
-    billingPeriod: string;
     startDate: string;
     endDate?: string;
-    autoClose: boolean;
-    closeable: boolean;
-    renewable: boolean;
-    pausable: boolean;
   }>;
 }
 
@@ -147,61 +155,18 @@ export default function ProductsPage() {
     try {
       const token = getToken();
 
-      // Create product first (without recurring plans)
+      // Create product along with variants and recurring plan infos
       const prodRes = await fetch("/api/admin/products", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          ...formData.product,
-        }),
+        body: JSON.stringify(formData),
       });
       if (!prodRes.ok) {
         const e = await prodRes.json();
         throw new Error(e.error || "Failed to create product");
-      }
-
-      const productData = await prodRes.json();
-      const productId = productData.product.id;
-
-      // Create recurring plans
-      if (formData.recurringPlans && formData.recurringPlans.length > 0) {
-        for (const plan of formData.recurringPlans) {
-          const planResponse = await fetch("/api/admin/recurring-plans", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              productId,
-              ...plan,
-            }),
-          });
-
-          if (!planResponse.ok) {
-            const planError = await planResponse.json();
-            throw new Error(planError.error || "Failed to create recurring plan");
-          }
-        }
-      }
-
-      // 3. Create variants (form sends all as variants array)
-      for (const v of formData.variants) {
-        const vRes = await fetch("/api/admin/variants", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ productId, ...v }),
-        });
-        if (!vRes.ok) {
-          const e = await vRes.json();
-          throw new Error(e.error || "Failed to create variant");
-        }
       }
 
       await fetchProducts();
@@ -554,16 +519,16 @@ export default function ProductsPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          {product.recurringPlans && product.recurringPlans.length > 0 ? (
+                          {product.recurringPlanInfos && product.recurringPlanInfos.length > 0 ? (
                             <div className="flex flex-wrap gap-1">
-                              {product.recurringPlans.slice(0, 1).map((plan) => (
-                                <Badge key={plan.id} variant="outline" className="text-[11px]">
-                                  {plan.billingPeriod}
+                              {product.recurringPlanInfos.slice(0, 1).map((info) => (
+                                <Badge key={info.id} variant="outline" className="text-[11px]">
+                                  {info.recurringPlan.billingPeriod}
                                 </Badge>
                               ))}
-                              {product.recurringPlans.length > 1 && (
+                              {product.recurringPlanInfos.length > 1 && (
                                 <Badge variant="secondary" className="text-[11px]">
-                                  +{product.recurringPlans.length - 1} plans
+                                  +{product.recurringPlanInfos.length - 1} plans
                                 </Badge>
                               )}
                             </div>

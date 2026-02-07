@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import {
   Shield,
   Users,
@@ -23,6 +24,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useProtectedRoute } from "@/hooks/useProtectedRoute";
 
 export default function InternalPage() {
+  const router = useRouter();
   const { user, logout } = useAuth();
   const { loading } = useProtectedRoute({
     requireAuth: true,
@@ -225,20 +227,24 @@ export default function InternalPage() {
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-chart-5/10">
-                  <BarChart3 className="h-5 w-5 text-chart-5" />
+                  <Package className="h-5 w-5 text-chart-5" />
                 </div>
                 <div>
-                  <CardTitle>Analytics</CardTitle>
-                  <CardDescription>Reports and insights</CardDescription>
+                  <CardTitle>Products</CardTitle>
+                  <CardDescription>Manage product catalog</CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
               <p className="mb-4 text-sm text-muted-foreground">
-                View detailed analytics and generate reports.
+                Create and manage products with variants and pricing.
               </p>
-              <Button className="w-full" variant="secondary">
-                View Analytics
+              <Button
+                className="w-full"
+                variant="secondary"
+                onClick={() => router.push("/internal/products")}
+              >
+                Manage Products
               </Button>
             </CardContent>
           </Card>

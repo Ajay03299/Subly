@@ -22,29 +22,49 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-
-const MOCK_USER = {
-  name: "Ashik D",
-  email: "ashik@company.com",
-  phone: "+91 98765 43210",
-  address: "456 Business Hub, Mumbai, India",
-  role: "Internal User" as const,
-  memberSince: "December 2024",
-};
+import { useAuth } from "@/lib/auth-context";
+import { useProtectedRoute } from "@/hooks/useProtectedRoute";
 
 export default function InternalProfilePage() {
+  const { user } = useAuth();
+  const { loading } = useProtectedRoute({ requireAuth: true });
+
   const [editing, setEditing] = useState(false);
-  const [user, setUser] = useState(MOCK_USER);
-  const [form, setForm] = useState(MOCK_USER);
+  const [profileData, setProfileData] = useState({
+    phone: "",
+    address: "",
+  });
+  const [formData, setFormData] = useState(profileData);
+
+  if (loading || !user) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <p className="text-lg">Loading...</p>
+      </div>
+    );
+  }
 
   const handleSave = () => {
-    setUser(form);
+    setProfileData(formData);
     setEditing(false);
   };
 
   const handleCancel = () => {
-    setForm(user);
+    setFormData(profileData);
     setEditing(false);
+  };
+
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case "ADMIN":
+        return "Administrator";
+      case "INTERNAL_USER":
+        return "Internal User";
+      case "USER":
+        return "User";
+      default:
+        return role;
+    }
   };
 
   return (
@@ -86,18 +106,15 @@ export default function InternalProfilePage() {
         <Card className="md:col-span-1">
           <CardContent className="flex flex-col items-center gap-4 pt-8">
             <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-accent/30 text-2xl font-bold text-primary">
-              {user.name
-                .split(" ")
-                .map((n) => n[0])
-                .join("")}
+              {user.email.substring(0, 1).toUpperCase()}
             </div>
             <div className="text-center">
-              <h2 className="text-lg font-semibold">{user.name}</h2>
+              <h2 className="text-lg font-semibold">{user.email.split("@")[0]}</h2>
               <p className="text-sm text-muted-foreground">{user.email}</p>
             </div>
             <Badge variant="secondary" className="gap-1">
               <Shield className="h-3 w-3" />
-              {user.role}
+              {getRoleLabel(user.role)}
             </Badge>
           </CardContent>
         </Card>
@@ -109,55 +126,49 @@ export default function InternalProfilePage() {
             <CardDescription>Personal and contact info</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            <Field icon={User} label="Full Name" editing={editing}>
-              {editing ? (
-                <Input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                />
-              ) : (
-                <p className="text-sm">{user.name}</p>
-              )}
+            <Field icon={Mail} label="Email" editing={false}>
+              <p className="text-sm">{user.email}</p>
             </Field>
 
-            <Field icon={Mail} label="Email" editing={editing}>
-              {editing ? (
-                <Input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                />
-              ) : (
-                <p className="text-sm">{user.email}</p>
-              )}
+            <Field icon={Shield} label="Role" editing={false}>
+              <p className="text-sm">{getRoleLabel(user.role)}</p>
             </Field>
 
             <Field icon={Phone} label="Phone" editing={editing}>
               {editing ? (
                 <Input
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  value={formData.phone}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setFormData({ ...formData, phone: e.target.value })
+                  }
+                  placeholder="Enter phone number"
                 />
               ) : (
-                <p className="text-sm">{user.phone}</p>
+                <p className="text-sm">{profileData.phone || "Not provided"}</p>
               )}
             </Field>
 
             <Field icon={MapPin} label="Address" editing={editing}>
               {editing ? (
                 <Input
-                  value={form.address}
-                  onChange={(e) =>
-                    setForm({ ...form, address: e.target.value })
+                  value={formData.address}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setFormData({ ...formData, address: e.target.value })
                   }
+                  placeholder="Enter address"
                 />
               ) : (
-                <p className="text-sm">{user.address}</p>
+                <p className="text-sm">{profileData.address || "Not provided"}</p>
               )}
             </Field>
 
             <Field icon={CalendarDays} label="Member Since" editing={false}>
-              <p className="text-sm">{user.memberSince}</p>
+              <p className="text-sm">
+                {new Date(user.createdAt).toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "long",
+                })}
+              </p>
             </Field>
           </CardContent>
         </Card>

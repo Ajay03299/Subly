@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth-context";
 
 const NAV_TABS = [
   { label: "Subscriptions", href: "/internal/subscriptions" },
@@ -27,9 +28,11 @@ const NAV_TABS = [
 export function InternalNavbar() {
   const pathname = usePathname();
   const [profileOpen, setProfileOpen] = useState(false);
+  const { user, logout } = useAuth();
 
-  // Mock user
-  const userName = "Ashik D";
+  // Get user name from email
+  const userName = user?.email?.split("@")[0]?.charAt(0).toUpperCase() + user?.email?.split("@")[0]?.slice(1) || "User";
+  const userInitial = user?.email?.substring(0, 1).toUpperCase() || "U";
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-md">
@@ -64,12 +67,9 @@ export function InternalNavbar() {
                 onBlur={() => setTimeout(() => setProfileOpen(false), 150)}
               >
                 <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                  {userName
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")}
+                  {userInitial}
                 </div>
-                <span className="hidden font-medium sm:inline">{userName}</span>
+                <span className="hidden font-medium sm:inline">{user?.email?.split("@")[0]}</span>
                 <ChevronDown
                   className={cn(
                     "h-3 w-3 transition-transform",
@@ -88,7 +88,10 @@ export function InternalNavbar() {
                     My Profile
                   </Link>
                   <hr className="my-1 border-border" />
-                  <button className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10">
+                  <button
+                    onClick={() => logout()}
+                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10"
+                  >
                     <LogOut className="h-4 w-4" />
                     Sign Out
                   </button>

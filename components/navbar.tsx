@@ -10,13 +10,17 @@ import {
   LogOut,
   ClipboardList,
   UserCircle,
+  LogIn,
+  UserPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth-context"; 
 
 export function Navbar() {
   const [accountOpen, setAccountOpen] = useState(false);
+  const { user, loading, logout } = useAuth();
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-md">
@@ -50,48 +54,71 @@ export function Navbar() {
             </span>
           </Button>
 
-          {/* My Account dropdown */}
-          <div className="relative">
-            <Button
-              variant="ghost"
-              className="flex items-center gap-1.5 text-sm"
-              onClick={() => setAccountOpen(!accountOpen)}
-              onBlur={() => setTimeout(() => setAccountOpen(false), 150)}
-            >
-              <User className="h-4 w-4" />
-              <span className="hidden sm:inline">My Account</span>
-              <ChevronDown
-                className={cn(
-                  "h-3 w-3 transition-transform",
-                  accountOpen && "rotate-180"
-                )}
-              />
-            </Button>
+          {/* Auth: Login/Sign up when signed out, My Account when signed in */}
+          {loading ? (
+            <div className="h-9 w-24 animate-pulse rounded-md bg-muted" />
+          ) : user ? (
+            <div className="relative">
+              <Button
+                variant="ghost"
+                className="flex items-center gap-1.5 text-sm"
+                onClick={() => setAccountOpen(!accountOpen)}
+                onBlur={() => setTimeout(() => setAccountOpen(false), 150)}
+              >
+                <User className="h-4 w-4" />
+                <span className="hidden sm:inline">My Account</span>
+                <ChevronDown
+                  className={cn(
+                    "h-3 w-3 transition-transform",
+                    accountOpen && "rotate-180"
+                  )}
+                />
+              </Button>
 
-            {accountOpen && (
-              <div className="absolute right-0 mt-2 w-48 rounded-lg border border-border bg-popover p-1 shadow-lg">
-                <Link
-                  href="/profile"
-                  className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-popover-foreground transition-colors hover:bg-accent"
-                >
-                  <UserCircle className="h-4 w-4" />
-                  My Profile
+              {accountOpen && (
+                <div className="absolute right-0 mt-2 w-48 rounded-lg border border-border bg-popover p-1 shadow-lg">
+                  <Link
+                    href="/profile"
+                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-popover-foreground transition-colors hover:bg-accent"
+                  >
+                    <UserCircle className="h-4 w-4" />
+                    My Profile
+                  </Link>
+                  <Link
+                    href="/orders"
+                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-popover-foreground transition-colors hover:bg-accent"
+                  >
+                    <ClipboardList className="h-4 w-4" />
+                    My Orders
+                  </Link>
+                  <hr className="my-1 border-border" />
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10"
+                    onClick={() => logout()}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 sm:gap-2">
+              <Button variant="ghost" size="sm" className="gap-1.5" asChild>
+                <Link href="/login">
+                  <LogIn className="h-4 w-4" />
+                  <span className="hidden sm:inline">Login</span>
                 </Link>
-                <Link
-                  href="/orders"
-                  className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-popover-foreground transition-colors hover:bg-accent"
-                >
-                  <ClipboardList className="h-4 w-4" />
-                  My Orders
+              </Button>
+              <Button size="sm" className="gap-1.5" asChild>
+                <Link href="/signup">
+                  <UserPlus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Sign up</span>
                 </Link>
-                <hr className="my-1 border-border" />
-                <button className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10">
-                  <LogOut className="h-4 w-4" />
-                  Sign Out
-                </button>
-              </div>
-            )}
-          </div>
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </nav>

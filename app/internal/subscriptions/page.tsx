@@ -338,15 +338,13 @@ export default function SubscriptionsPage() {
       const data = await res.json();
 
       if (action === "renew") {
-        // Open the newly renewed subscription
-        setActiveSubscription(data.subscription);
-        setView(data.subscription.id);
-        setSuccess("Subscription renewed — new order created");
+        // Renew confirms directly — show success and refresh list
+        setSuccess("Subscription renewed — new confirmed order created");
       } else if (action === "upsell") {
-        // Same as renew but for upsell
+        // Upsell creates an editable DRAFT — open it for editing
         setActiveSubscription(data.subscription);
         setView(data.subscription.id);
-        setSuccess("Upsell order created");
+        setSuccess("Upsell draft created — you can edit it before confirming");
       } else if (action === "create_invoice") {
         // Refresh current subscription to show new invoice
         await fetchSubscription(activeSubscription.id);

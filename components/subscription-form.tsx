@@ -52,12 +52,12 @@ interface Product {
   type: string;
   salesPrice: number;
   costPrice: number;
-  recurringPlan?: {
+  recurringPlans?: Array<{
     id: string;
     name: string;
     price: number;
     billingPeriod: string;
-  } | null;
+  }>;
 }
 
 interface RecurringPlan {
@@ -226,9 +226,14 @@ export function SubscriptionForm({
 
   // Inline line editor state
   const [newLineProductId, setNewLineProductId] = useState("");
+  const [newLinePlanId, setNewLinePlanId] = useState("");
   const [newLineQty, setNewLineQty] = useState("1");
   const [newLineDiscount, setNewLineDiscount] = useState("0");
   const [newLineTaxRate, setNewLineTaxRate] = useState("0");
+
+  // Recurring plans filtered by selected product
+  const selectedProduct = products.find((p) => p.id === newLineProductId);
+  const plansForProduct = selectedProduct?.recurringPlans ?? [];
 
   // Customer search
   const [customerSearch, setCustomerSearch] = useState(
@@ -317,18 +322,29 @@ export function SubscriptionForm({
     const product = products.find((p) => p.id === newLineProductId);
     if (!product) return;
 
+    // Use recurring plan price if one is selected, otherwise use product salesPrice
+    const selectedPlan = plansForProduct.find((p) => p.id === newLinePlanId);
     const qty = parseInt(newLineQty) || 1;
-    const price = Number(product.salesPrice);
+    const price = selectedPlan ? Number(selectedPlan.price) : Number(product.salesPrice);
     const discount = parseFloat(newLineDiscount) || 0;
     const taxRate = parseFloat(newLineTaxRate) || 0;
     const discounted = price * (1 - discount / 100);
     const amount = qty * discounted * (1 + taxRate / 100);
 
+    const planSuffix = selectedPlan
+      ? ` (${selectedPlan.name} — ${selectedPlan.billingPeriod.toLowerCase()})`
+      : "";
+
+    // Also set the subscription-level recurringPlanId if a plan was chosen
+    if (selectedPlan) {
+      setRecurringPlanId(selectedPlan.id);
+    }
+
     setLines([
       ...lines,
       {
         productId: product.id,
-        productName: product.name,
+        productName: product.name + planSuffix,
         quantity: qty,
         unitPrice: price,
         discount,
@@ -338,6 +354,7 @@ export function SubscriptionForm({
     ]);
 
     setNewLineProductId("");
+    setNewLinePlanId("");
     setNewLineQty("1");
     setNewLineDiscount("0");
   };
@@ -480,7 +497,7 @@ export function SubscriptionForm({
           </>
         )}
 
-        {/* Confirmed actions: Create Invoice, Renew, Cancel, Upsell, Close */}
+        {/* Confirmed actions: Create Invoice, Renew (confirm directly), Upsell (editable copy), Close */}
         {status === "CONFIRMED" && (
           <>
             <Button
@@ -508,15 +525,6 @@ export function SubscriptionForm({
             >
               <ArrowUpCircle className="h-4 w-4" />
               Upsell
-            </Button>
-            <Button
-              variant="destructive"
-              className="gap-2"
-              onClick={() => onStatusChange("CLOSED")}
-              disabled={loading}
-            >
-              <XCircle className="h-4 w-4" />
-              Cancel
             </Button>
             <Button
               variant="outline"
@@ -549,6 +557,15 @@ export function SubscriptionForm({
             >
               <RefreshCw className="h-4 w-4" />
               Renew
+            </Button>
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => onAction("upsell")}
+              disabled={loading}
+            >
+              <ArrowUpCircle className="h-4 w-4" />
+              Upsell
             </Button>
             <Button
               variant="outline"
@@ -623,31 +640,6 @@ export function SubscriptionForm({
               </div>
             </div>
 
-            {/* Recurring Plan */}
-            <div className="space-y-2">
-              <Label>Recurring Plan</Label>
-              <Select
-                value={recurringPlanId || "none"}
-                onValueChange={(v) =>
-                  setRecurringPlanId(v === "none" ? "" : v)
-                }
-                disabled={isReadOnly}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select plan..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No recurring plan</SelectItem>
-                  {recurringPlans.map((plan) => (
-                    <SelectItem key={plan.id} value={plan.id}>
-                      {plan.name} — ₹{Number(plan.price).toFixed(2)} /{" "}
-                      {plan.billingPeriod.toLowerCase()}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Payment Terms */}
             <div className="space-y-2">
               <Label>Payment Terms</Label>
@@ -711,9 +703,10 @@ export function SubscriptionForm({
                     <Label className="text-xs">Product</Label>
                     <Select
                       value={newLineProductId || "placeholder"}
-                      onValueChange={(v) =>
-                        setNewLineProductId(v === "placeholder" ? "" : v)
-                      }
+                      onValueChange={(v) => {
+                        setNewLineProductId(v === "placeholder" ? "" : v);
+                        setNewLinePlanId(""); // reset plan when product changes
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select product..." />
@@ -725,6 +718,41 @@ export function SubscriptionForm({
                         {products.map((p) => (
                           <SelectItem key={p.id} value={p.id}>
                             {p.name} — ₹{Number(p.salesPrice).toFixed(2)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Recurring Plan — filtered by selected product */}
+                  <div className="min-w-[180px] flex-1 space-y-1">
+                    <Label className="text-xs">Recurring Plan</Label>
+                    <Select
+                      value={newLinePlanId || "none"}
+                      onValueChange={(v) =>
+                        setNewLinePlanId(v === "none" ? "" : v)
+                      }
+                      disabled={!newLineProductId || plansForProduct.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue
+                          placeholder={
+                            !newLineProductId
+                              ? "Select a product first"
+                              : plansForProduct.length === 0
+                                ? "No plans available"
+                                : "Select plan..."
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">
+                          No plan (use sales price)
+                        </SelectItem>
+                        {plansForProduct.map((plan) => (
+                          <SelectItem key={plan.id} value={plan.id}>
+                            {plan.name} — ₹{Number(plan.price).toFixed(2)} /{" "}
+                            {plan.billingPeriod.toLowerCase()}
                           </SelectItem>
                         ))}
                       </SelectContent>

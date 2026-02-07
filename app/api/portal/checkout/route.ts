@@ -173,10 +173,59 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // ── Create Invoice (PAID) ────────────────────────────
+    const invoiceNo = `INV/${String(Date.now()).slice(-6)}`;
+
+    const invoice = await prisma.invoice.create({
+      data: {
+        invoiceNo,
+        subscriptionId: subscription.id,
+        status: "PAID",
+        issueDate: new Date(),
+        dueDate: new Date(), // paid immediately
+        subtotal: computedSubtotal,
+        taxAmount: computedTax,
+        totalAmount: computedTotal,
+        lines: {
+          create: lineData.map((l) => ({
+            productId: l.productId,
+            quantity: l.quantity,
+            unitPrice: l.unitPrice,
+            taxAmount: l.quantity * Number(l.unitPrice) * (Number(l.taxRate) / 100),
+            amount: l.amount,
+          })),
+        },
+      },
+    });
+
+    // ── Record Payment ───────────────────────────────────
+    await prisma.payment.create({
+      data: {
+        method: "CREDIT_CARD", // default for portal checkout
+        amount: computedTotal,
+        paymentDate: new Date(),
+        subscriptionId: subscription.id,
+        invoiceId: invoice.id,
+        userId,
+      },
+    });
+
+    // Re-fetch subscription with invoice and payment data included
+    const fullSubscription = await prisma.subscription.findUnique({
+      where: { id: subscription.id },
+      include: {
+        user: { select: { id: true, email: true } },
+        recurringPlan: true,
+        lines: { include: { product: true } },
+        invoices: { include: { lines: true, payments: true } },
+        payments: true,
+      },
+    });
+
     return NextResponse.json(
       {
         message: "Order placed successfully",
-        subscription,
+        subscription: fullSubscription,
       },
       { status: 201 }
     );

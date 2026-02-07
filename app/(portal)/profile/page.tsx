@@ -231,13 +231,13 @@ export default function ProfilePage() {
                 <User className="h-4 w-4" />
                 Verification Status
               </label>
-              <p className="text-sm">
+              <div className="text-sm">
                 {user.verifiedAt ? (
                   <Badge variant="default">Verified</Badge>
                 ) : (
                   <Badge variant="secondary">Not Verified</Badge>
                 )}
-              </p>
+              </div>
             </div>
           </CardContent>
         </Card>

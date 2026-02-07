@@ -194,8 +194,46 @@ export async function PATCH(
       delete body.lines;
     }
 
-    // Handle "renew" action — create a new subscription with same lines
+    // Handle "renew" action — create a CONFIRMED copy (no edits needed)
     if (body.action === "renew") {
+      const newSubNo = await generateSubscriptionNo();
+
+      const newSub = await prisma.subscription.create({
+        data: {
+          subscriptionNo: newSubNo,
+          userId: existing.userId,
+          recurringPlanId: existing.recurringPlanId,
+          paymentTerms: existing.paymentTerms,
+          status: "CONFIRMED",
+          subtotal: existing.subtotal,
+          taxAmount: existing.taxAmount,
+          totalAmount: existing.totalAmount,
+          lines: {
+            create: existing.lines.map((line) => ({
+              productId: line.productId,
+              quantity: line.quantity,
+              unitPrice: line.unitPrice,
+              taxRate: line.taxRate,
+              amount: line.amount,
+            })),
+          },
+        },
+        include: {
+          user: { select: { id: true, email: true } },
+          recurringPlan: true,
+          lines: { include: { product: true } },
+          invoices: true,
+        },
+      });
+
+      return NextResponse.json(
+        { message: "Subscription renewed and confirmed", subscription: newSub },
+        { status: 201 }
+      );
+    }
+
+    // Handle "upsell" action — create an editable DRAFT copy
+    if (body.action === "upsell") {
       const newSubNo = await generateSubscriptionNo();
 
       const newSub = await prisma.subscription.create({
@@ -227,7 +265,7 @@ export async function PATCH(
       });
 
       return NextResponse.json(
-        { message: "Subscription renewed", subscription: newSub },
+        { message: "Upsell order created", subscription: newSub },
         { status: 201 }
       );
     }
@@ -277,9 +315,78 @@ export async function PATCH(
         user: { select: { id: true, email: true } },
         recurringPlan: true,
         lines: { include: { product: true } },
-        invoices: true,
+        invoices: { include: { lines: true, payments: true } },
+        payments: true,
       },
     });
+
+    // ── When transitioning to ACTIVE, create Invoice (PAID) + Payment ──
+    if (
+      body.status === "ACTIVE" &&
+      existing.status !== "ACTIVE"
+    ) {
+      // Check if there are already payments for this subscription
+      const existingPayments = await prisma.payment.count({
+        where: { subscriptionId: id },
+      });
+
+      if (existingPayments === 0) {
+        const totalAmount = Number(existing.totalAmount);
+
+        // Create a PAID invoice
+        const invoiceNo = `INV/${String(Date.now()).slice(-6)}`;
+        const invoice = await prisma.invoice.create({
+          data: {
+            invoiceNo,
+            subscriptionId: id,
+            status: "PAID",
+            issueDate: new Date(),
+            dueDate: new Date(),
+            subtotal: existing.subtotal,
+            taxAmount: existing.taxAmount,
+            totalAmount: existing.totalAmount,
+            lines: {
+              create: existing.lines.map((line) => ({
+                productId: line.productId,
+                quantity: line.quantity,
+                unitPrice: line.unitPrice,
+                taxAmount: Number(line.amount) - Number(line.unitPrice) * line.quantity,
+                amount: line.amount,
+              })),
+            },
+          },
+        });
+
+        // Create a Payment record
+        await prisma.payment.create({
+          data: {
+            method: "BANK_TRANSFER", // default for internal completion
+            amount: totalAmount,
+            paymentDate: new Date(),
+            subscriptionId: id,
+            invoiceId: invoice.id,
+            userId: existing.userId,
+          },
+        });
+
+        // Re-fetch to include the new invoice & payment
+        const refreshed = await prisma.subscription.findUnique({
+          where: { id },
+          include: {
+            user: { select: { id: true, email: true } },
+            recurringPlan: true,
+            lines: { include: { product: true } },
+            invoices: { include: { lines: true, payments: true } },
+            payments: true,
+          },
+        });
+
+        return NextResponse.json(
+          { message: "Subscription updated", subscription: refreshed },
+          { status: 200 }
+        );
+      }
+    }
 
     return NextResponse.json(
       { message: "Subscription updated", subscription },

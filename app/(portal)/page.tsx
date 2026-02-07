@@ -39,7 +39,7 @@ interface Product {
   tag: ProductTag | null;
   averageRating: number;
   images: ProductImage[];
-  recurringPlans: Array<{
+  recurringPlans?: Array<{
     id: string;
     name: string;
     price: number;
@@ -87,8 +87,8 @@ export default function ShopPage() {
       p.tag?.name.toLowerCase().includes(search.toLowerCase());
     return matchesSearch;
   }).sort((a, b) => {
-    const priceA = a.recurringPlans[0]?.price ?? 0;
-    const priceB = b.recurringPlans[0]?.price ?? 0;
+    const priceA = a.recurringPlans?.[0]?.price ?? 0;
+    const priceB = b.recurringPlans?.[0]?.price ?? 0;
     return sortAsc ? priceA - priceB : priceB - priceA;
   });
 
@@ -161,7 +161,7 @@ export default function ShopPage() {
               >
                 {product.tag && (
                   <Badge className="absolute right-3 top-3 z-10">
-                    {product.tag}
+                    {product.tag.name}
                   </Badge>
                 )}
 
@@ -214,7 +214,7 @@ export default function ShopPage() {
                     </span>
                   </div>
 
-                  {product.recurringPlans?.length > 0 && (
+                  {product.recurringPlans?.length ? (
                     <>
                       <div className="mt-3 flex items-baseline gap-1">
                         <span className="text-2xl font-bold">
@@ -230,7 +230,7 @@ export default function ShopPage() {
                         </p>
                       )}
                     </>
-                  )}
+                  ) : null}
                 </CardContent>
 
                 <CardFooter className="px-5 pb-5 pt-0">

@@ -148,7 +148,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const subtotal = items.reduce((s, i) => {
     const base =
-      i.plan === "Monthly" ? i.product.monthlyPrice : i.product.yearlyPrice;
+      typeof i.plan === "string"
+        ? i.plan === "Monthly"
+          ? (i.product.monthlyPrice ?? Number(i.product.salesPrice) ?? 0)
+          : (i.product.yearlyPrice ?? Number(i.product.salesPrice) ?? 0)
+        : Number(i.plan?.price) || Number(i.product.salesPrice) || 0;
     const extra = i.selectedVariant?.extraPrice ?? 0;
     return s + (base + extra) * i.quantity;
   }, 0);

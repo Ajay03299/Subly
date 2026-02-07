@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   CheckCircle2,
   ShoppingBag,
   ArrowRight,
   Download,
   Package,
+  Loader2,
+  FileText,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,48 +30,126 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useCart } from "@/lib/cart-context";
+import { generateOrderPdf } from "@/lib/generate-pdf";
 
-export default function OrderConfirmationPage() {
-  const {
-    items,
-    subtotal,
-    taxRate,
-    taxAmount,
-    total,
-    discountApplied,
-    discountAmount,
-    clearCart,
-  } = useCart();
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
 
-  // Generate a mock order number
-  const orderNumber = useMemo(
-    () => `S${String(Math.floor(Math.random() * 9000) + 1000).padStart(4, "0")}`,
-    []
-  );
-  const orderDate = new Date().toLocaleDateString("en-IN", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+interface Subscription {
+  id: string;
+  subscriptionNo: string;
+  status: string;
+  userId: string;
+  user?: { id: string; email: string };
+  recurringPlan?: {
+    name: string;
+    price: number;
+    billingPeriod: string;
+    startDate: string;
+    endDate: string | null;
+  } | null;
+  paymentTerms: string | null;
+  subtotal: number;
+  taxAmount: number;
+  totalAmount: number;
+  lines: Array<{
+    id: string;
+    productId: string;
+    product: { id: string; name: string; salesPrice: number };
+    quantity: number;
+    unitPrice: number;
+    taxRate: number;
+    amount: number;
+  }>;
+  createdAt: string;
+}
 
-  // Snapshot items before clearing
-  const orderItems = useMemo(() => [...items], [items]);
-  const orderSubtotal = subtotal;
-  const orderTax = taxAmount;
-  const orderTotal = total;
-  const orderDiscount = discountAmount;
-  const hadDiscount = discountApplied;
+function formatCurrency(amount: number) {
+  return `₹${Number(amount).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
 
-  // Clear cart after rendering (order placed)
-  useEffect(() => {
-    if (items.length > 0) {
-      // small delay so snapshot is captured
-      const t = setTimeout(() => clearCart(), 100);
-      return () => clearTimeout(t);
+/* ------------------------------------------------------------------ */
+/*  Inner component (uses useSearchParams)                             */
+/* ------------------------------------------------------------------ */
+
+function OrderConfirmationContent() {
+  const searchParams = useSearchParams();
+  const orderId = searchParams.get("orderId");
+
+  const { clearCart } = useCart();
+
+  const [order, setOrder] = useState<Subscription | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [cartCleared, setCartCleared] = useState(false);
+
+  const getToken = () => localStorage.getItem("accessToken") ?? "";
+
+  /* ── Fetch the real order ───────────────────────────── */
+  const fetchOrder = useCallback(async () => {
+    if (!orderId) {
+      setLoading(false);
+      return;
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (orderItems.length === 0) {
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/portal/subscriptions/${orderId}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch order");
+      const data = await res.json();
+      setOrder(data.subscription);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load order");
+    } finally {
+      setLoading(false);
+    }
+  }, [orderId]);
+
+  useEffect(() => {
+    fetchOrder();
+  }, [fetchOrder]);
+
+  /* ── Clear cart once after order loads ───────────────── */
+  useEffect(() => {
+    if (order && !cartCleared) {
+      clearCart();
+      setCartCleared(true);
+    }
+  }, [order, cartCleared, clearCart]);
+
+  /* ── Handle PDF download ────────────────────────────── */
+  const handleDownload = () => {
+    if (!order) return;
+
+    generateOrderPdf({
+      subscriptionNo: order.subscriptionNo,
+      status: order.status,
+      customerEmail: order.user?.email || "",
+      planName: order.recurringPlan?.name,
+      startDate: order.recurringPlan?.startDate,
+      endDate: order.recurringPlan?.endDate,
+      createdAt: order.createdAt,
+      lines: order.lines.map((l) => ({
+        productName: l.product.name,
+        quantity: l.quantity,
+        unitPrice: Number(l.unitPrice),
+        taxRate: Number(l.taxRate),
+        amount: Number(l.amount),
+      })),
+      subtotal: Number(order.subtotal),
+      taxAmount: Number(order.taxAmount),
+      totalAmount: Number(order.totalAmount),
+    });
+  };
+
+  /* ── No order ID in URL ─────────────────────────────── */
+  if (!orderId) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
         <ShoppingBag className="h-16 w-16 text-muted-foreground/40" />
@@ -75,12 +157,53 @@ export default function OrderConfirmationPage() {
         <p className="text-muted-foreground">
           Looks like you haven&apos;t placed an order yet.
         </p>
-        <Button asChild>
-          <Link href="/">Go to Shop</Link>
-        </Button>
+        <div className="flex gap-3">
+          <Button asChild>
+            <Link href="/">Go to Shop</Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/orders">My Orders</Link>
+          </Button>
+        </div>
       </div>
     );
   }
+
+  /* ── Loading ────────────────────────────────────────── */
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <p className="text-muted-foreground">Loading your order...</p>
+      </div>
+    );
+  }
+
+  /* ── Error ──────────────────────────────────────────── */
+  if (error || !order) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
+        <AlertCircle className="h-12 w-12 text-destructive/60" />
+        <h2 className="text-xl font-bold">Something went wrong</h2>
+        <p className="text-muted-foreground">
+          {error || "Could not load your order."}
+        </p>
+        <div className="flex gap-3">
+          <Button asChild>
+            <Link href="/orders">Go to My Orders</Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/">Continue Shopping</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Computed ───────────────────────────────────────── */
+  const subtotal = Number(order.subtotal);
+  const taxAmount = Number(order.taxAmount);
+  const total = Number(order.totalAmount);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
@@ -101,12 +224,18 @@ export default function OrderConfirmationPage() {
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle className="text-lg">Order {orderNumber}</CardTitle>
+            <CardTitle className="text-lg">
+              Order {order.subscriptionNo}
+            </CardTitle>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              {orderDate}
+              {new Date(order.createdAt).toLocaleDateString("en-IN", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
             </p>
           </div>
-          <Badge variant="secondary" className="gap-1">
+          <Badge variant="default" className="gap-1">
             <Package className="h-3 w-3" />
             Confirmed
           </Badge>
@@ -118,43 +247,34 @@ export default function OrderConfirmationPage() {
               <TableHeader>
                 <TableRow className="bg-muted/40">
                   <TableHead>Product</TableHead>
-                  <TableHead>Plan</TableHead>
                   <TableHead className="text-center">Qty</TableHead>
+                  <TableHead className="text-right">Unit Price</TableHead>
+                  <TableHead className="text-right">Tax</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {orderItems.map((item) => {
-                  const base =
-                    item.plan === "Monthly"
-                      ? item.product.monthlyPrice
-                      : item.product.yearlyPrice;
-                  const extra = item.selectedVariant?.extraPrice ?? 0;
-                  const lineTotal = (base + extra) * item.quantity;
-
-                  return (
-                    <TableRow key={item.product.id}>
-                      <TableCell>
-                        <p className="font-medium">{item.product.name}</p>
-                        {item.selectedVariant && (
-                          <p className="text-xs text-muted-foreground">
-                            {item.selectedVariant.attribute}:{" "}
-                            {item.selectedVariant.value}
-                          </p>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{item.plan}</Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {item.quantity}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        ₹{lineTotal.toLocaleString()}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {order.lines.map((line) => (
+                  <TableRow key={line.id}>
+                    <TableCell className="font-medium">
+                      {line.product.name}
+                    </TableCell>
+                    <TableCell className="text-center tabular-nums">
+                      {line.quantity}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatCurrency(Number(line.unitPrice))}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {Number(line.taxRate) > 0
+                        ? `${Number(line.taxRate)}%`
+                        : "—"}
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">
+                      {formatCurrency(Number(line.amount))}
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </div>
@@ -163,36 +283,16 @@ export default function OrderConfirmationPage() {
           <div className="mt-4 space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Subtotal</span>
-              <span>₹{orderSubtotal.toLocaleString()}</span>
+              <span className="tabular-nums">{formatCurrency(subtotal)}</span>
             </div>
-            {hadDiscount && (
-              <div className="flex justify-between text-chart-2">
-                <span>Discount</span>
-                <span>−₹{orderDiscount.toLocaleString()}</span>
-              </div>
-            )}
             <div className="flex justify-between">
-              <span className="text-muted-foreground">
-                Taxes ({(taxRate * 100).toFixed(0)}%)
-              </span>
-              <span>
-                ₹
-                {orderTax.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </span>
+              <span className="text-muted-foreground">Tax</span>
+              <span className="tabular-nums">{formatCurrency(taxAmount)}</span>
             </div>
             <hr className="border-border" />
             <div className="flex justify-between text-base font-bold">
               <span>Total</span>
-              <span>
-                ₹
-                {orderTotal.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </span>
+              <span className="tabular-nums">{formatCurrency(total)}</span>
             </div>
           </div>
         </CardContent>
@@ -200,17 +300,47 @@ export default function OrderConfirmationPage() {
 
       {/* ── Actions ──────────────────────────────────────── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-        <Button variant="outline" className="gap-2">
+        <Button variant="outline" className="gap-2" onClick={handleDownload}>
           <Download className="h-4 w-4" />
           Download Order PDF
         </Button>
         <Button className="gap-2" asChild>
-          <Link href="/">
-            Continue Shopping
+          <Link href={`/orders/${order.id}`}>
+            <FileText className="h-4 w-4" />
+            View Order Details
+          </Link>
+        </Button>
+        <Button variant="ghost" className="gap-2" asChild>
+          <Link href="/orders">
+            My Orders
             <ArrowRight className="h-4 w-4" />
           </Link>
         </Button>
       </div>
+
+      <div className="mt-6 text-center">
+        <Button variant="link" asChild>
+          <Link href="/">Continue Shopping</Link>
+        </Button>
+      </div>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Page wrapper with Suspense for useSearchParams                     */
+/* ------------------------------------------------------------------ */
+
+export default function OrderConfirmationPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
+      <OrderConfirmationContent />
+    </Suspense>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -10,6 +11,8 @@ import {
   Tag,
   ShoppingBag,
   CheckCircle2,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,9 +51,84 @@ export default function CartPage() {
     clearCart,
   } = useCart();
 
-  function handleCheckout() {
-    // In production this would create a real order via API
-    router.push("/order-confirmation");
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
+  async function handleCheckout() {
+    setCheckoutLoading(true);
+    setCheckoutError(null);
+
+    try {
+      const token = localStorage.getItem("accessToken");
+      if (!token) {
+        setCheckoutError("Please log in to complete your purchase.");
+        setCheckoutLoading(false);
+        return;
+      }
+
+      // Build cart items payload for the checkout API
+      const cartItems = items.map((item) => {
+        const base =
+          typeof item.plan === "string"
+            ? item.plan === "Monthly"
+              ? (item.product.monthlyPrice ?? Number(item.product.salesPrice) ?? 0)
+              : (item.product.yearlyPrice ?? Number(item.product.salesPrice) ?? 0)
+            : Number(item.plan?.price) || Number(item.product.salesPrice) || 0;
+        const extra = item.selectedVariant?.extraPrice ?? 0;
+        const unitPrice = base + extra;
+        const planLabel =
+          typeof item.plan === "string"
+            ? item.plan
+            : item.plan?.billingPeriod ?? "MONTHLY";
+
+        return {
+          productName: item.product.name,
+          productType: item.product.type,
+          salesPrice: item.product.salesPrice,
+          costPrice: item.product.costPrice,
+          unitPrice,
+          quantity: item.quantity,
+          taxRate: item.product.taxRate,
+          plan: planLabel,
+          variantInfo: item.selectedVariant
+            ? `${item.selectedVariant.attribute}: ${item.selectedVariant.value}`
+            : null,
+        };
+      });
+
+      const res = await fetch("/api/portal/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          items: cartItems,
+          subtotal,
+          taxAmount,
+          total,
+          discountApplied,
+          discountAmount,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Checkout failed");
+      }
+
+      const data = await res.json();
+      const subscriptionId = data.subscription.id;
+
+      // Navigate to confirmation page with the real order ID
+      router.push(`/order-confirmation?orderId=${subscriptionId}`);
+    } catch (err) {
+      setCheckoutError(
+        err instanceof Error ? err.message : "Failed to process checkout"
+      );
+    } finally {
+      setCheckoutLoading(false);
+    }
   }
 
   if (items.length === 0) {
@@ -104,12 +182,20 @@ export default function CartPage() {
               </TableHeader>
               <TableBody>
                 {items.map((item) => {
-                  const base =
-                    item.plan === "Monthly"
-                      ? item.product.monthlyPrice
-                      : item.product.yearlyPrice;
+                  const planLabel =
+                    typeof item.plan === "string"
+                      ? item.plan
+                      : item.plan?.name
+                        ? `${item.plan.name} (${item.plan.billingPeriod?.toLowerCase()})`
+                        : "—";
+                  const planPrice =
+                    typeof item.plan === "string"
+                      ? item.plan === "Monthly"
+                        ? (item.product.monthlyPrice ?? Number(item.product.salesPrice) ?? 0)
+                        : (item.product.yearlyPrice ?? Number(item.product.salesPrice) ?? 0)
+                      : Number(item.plan?.price) || Number(item.product.salesPrice) || 0;
                   const extra = item.selectedVariant?.extraPrice ?? 0;
-                  const lineTotal = (base + extra) * item.quantity;
+                  const lineTotal = (planPrice + extra) * item.quantity;
 
                   return (
                     <TableRow key={item.product.id}>
@@ -140,7 +226,7 @@ export default function CartPage() {
 
                       {/* Plan */}
                       <TableCell>
-                        <Badge variant="outline">{item.plan}</Badge>
+                        <Badge variant="outline">{planLabel}</Badge>
                       </TableCell>
 
                       {/* Quantity */}
@@ -272,13 +358,29 @@ export default function CartPage() {
                 </div>
               </div>
 
+              {/* Checkout error */}
+              {checkoutError && (
+                <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  {checkoutError}
+                </div>
+              )}
+
               {/* Checkout */}
               <Button
                 size="lg"
                 className="mt-2 w-full"
                 onClick={handleCheckout}
+                disabled={checkoutLoading}
               >
-                Checkout
+                {checkoutLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  "Checkout"
+                )}
               </Button>
 
               <p className="text-center text-xs text-muted-foreground">

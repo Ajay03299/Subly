@@ -184,8 +184,6 @@ model Subscription {
   recurringPlanId String?
   recurringPlan   RecurringPlan? @relation(fields: [recurringPlanId], references: [id])
 
-  startDate    DateTime
-  endDate      DateTime?
   paymentTerms String? // e.g. "Net 30", "Due on Receipt"
 
   status SubscriptionStatus @default(DRAFT)

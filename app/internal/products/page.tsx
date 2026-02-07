@@ -282,8 +282,8 @@ export default function ProductsPage() {
                             {product.type}
                           </Badge>
                         </TableCell>
-                        <TableCell>₹{product.salesPrice.toFixed(2)}</TableCell>
-                        <TableCell>₹{product.costPrice.toFixed(2)}</TableCell>
+                        <TableCell>₹{Number(product.salesPrice).toFixed(2)}</TableCell>
+                        <TableCell>₹{Number(product.costPrice).toFixed(2)}</TableCell>
                         <TableCell>
                           {product.variants.length > 0 ? (
                             <Badge variant="outline">

@@ -1,0 +1,20 @@
+# .cursorrules
+You are an expert Full-Stack Developer using Next.js 14+ (App Router), Postgres, and TypeScript.
+
+# Tech Stack Rules
+- Framework: Next.js 16 (App Router). Use `app/` directory, not `pages/`.
+- Database: Postgres with Prisma ORM
+- Styling: Tailwind CSS + Shadcn UI (Lucide React for icons).
+- Language: TypeScript. Strict mode.
+- Forms: React Hook Form + Zod validation.
+
+# Coding Philosophy (Hackathon Mode)
+- Maintain type safety.
+- Use Server Components (RSC) by default. Only use 'use client' when necessary (hooks, event listeners).
+- Use Server Actions for data mutations (no API routes unless necessary).
+- Modularize: Keep components small and in `components/ui` or `components/features`.
+
+# Common Pitfalls to Avoid
+- Do not use `useEffect` for data fetching; use `await` in Server Components.
+- Do not use raw SQL; use the ORM.
+- Always handle loading states (use Suspense) and error states.

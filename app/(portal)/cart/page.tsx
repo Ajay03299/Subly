@@ -1,0 +1,293 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  Trash2,
+  Minus,
+  Plus,
+  ArrowLeft,
+  Tag,
+  ShoppingBag,
+  CheckCircle2,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useCart } from "@/lib/cart-context";
+
+export default function CartPage() {
+  const router = useRouter();
+  const {
+    items,
+    removeItem,
+    updateQuantity,
+    subtotal,
+    taxRate,
+    taxAmount,
+    total,
+    discountCode,
+    setDiscountCode,
+    discountApplied,
+    applyDiscount,
+    discountAmount,
+    clearCart,
+  } = useCart();
+
+  function handleCheckout() {
+    // In production this would create a real order via API
+    router.push("/order-confirmation");
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
+        <ShoppingBag className="h-16 w-16 text-muted-foreground/40" />
+        <h2 className="text-2xl font-bold">Your cart is empty</h2>
+        <p className="text-muted-foreground">
+          Browse the shop and add products to get started.
+        </p>
+        <Button asChild>
+          <Link href="/">Continue Shopping</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      {/* Header */}
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+            Shopping Cart
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {items.length} item{items.length !== 1 && "s"} in your cart
+          </p>
+        </div>
+        <Button variant="ghost" size="sm" className="gap-2" asChild>
+          <Link href="/">
+            <ArrowLeft className="h-4 w-4" />
+            Continue Shopping
+          </Link>
+        </Button>
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-3">
+        {/* ── Cart items ─────────────────────────────────── */}
+        <div className="lg:col-span-2">
+          <div className="rounded-lg border border-border">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40">
+                  <TableHead className="w-[45%]">Product</TableHead>
+                  <TableHead>Plan</TableHead>
+                  <TableHead className="text-center">Qty</TableHead>
+                  <TableHead className="text-right">Price</TableHead>
+                  <TableHead className="w-10" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((item) => {
+                  const base =
+                    item.plan === "Monthly"
+                      ? item.product.monthlyPrice
+                      : item.product.yearlyPrice;
+                  const extra = item.selectedVariant?.extraPrice ?? 0;
+                  const lineTotal = (base + extra) * item.quantity;
+
+                  return (
+                    <TableRow key={item.product.id}>
+                      {/* Product */}
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted/50 text-lg font-bold text-primary">
+                            {item.product.name.charAt(0)}
+                          </div>
+                          <div>
+                            <Link
+                              href={`/shop/${item.product.id}`}
+                              className="font-medium hover:underline"
+                            >
+                              {item.product.name}
+                            </Link>
+                            {item.selectedVariant && (
+                              <p className="text-xs text-muted-foreground">
+                                {item.selectedVariant.attribute}:{" "}
+                                {item.selectedVariant.value}
+                                {item.selectedVariant.extraPrice > 0 &&
+                                  ` (+₹${item.selectedVariant.extraPrice})`}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+
+                      {/* Plan */}
+                      <TableCell>
+                        <Badge variant="outline">{item.plan}</Badge>
+                      </TableCell>
+
+                      {/* Quantity */}
+                      <TableCell>
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            className="rounded p-1 hover:bg-muted"
+                            onClick={() =>
+                              updateQuantity(
+                                item.product.id,
+                                item.quantity - 1
+                              )
+                            }
+                          >
+                            <Minus className="h-3.5 w-3.5" />
+                          </button>
+                          <span className="min-w-[2rem] text-center text-sm font-medium">
+                            {item.quantity}
+                          </span>
+                          <button
+                            className="rounded p-1 hover:bg-muted"
+                            onClick={() =>
+                              updateQuantity(
+                                item.product.id,
+                                item.quantity + 1
+                              )
+                            }
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </TableCell>
+
+                      {/* Price */}
+                      <TableCell className="text-right font-medium">
+                        ₹{lineTotal.toLocaleString()}
+                      </TableCell>
+
+                      {/* Remove */}
+                      <TableCell>
+                        <button
+                          className="rounded p-1 text-muted-foreground transition-colors hover:text-destructive"
+                          onClick={() => removeItem(item.product.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+
+        {/* ── Order Summary ──────────────────────────────── */}
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Order Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Discount code */}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-muted-foreground">
+                  Discount Code
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter code"
+                    value={discountCode}
+                    onChange={(e) => setDiscountCode(e.target.value)}
+                    disabled={discountApplied}
+                    className="text-sm"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 gap-1"
+                    onClick={applyDiscount}
+                    disabled={discountApplied || !discountCode}
+                  >
+                    <Tag className="h-3.5 w-3.5" />
+                    Apply
+                  </Button>
+                </div>
+                {discountApplied && (
+                  <p className="mt-1.5 flex items-center gap-1 text-xs text-chart-2">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    You have successfully applied the discount!
+                  </p>
+                )}
+              </div>
+
+              <hr className="border-border" />
+
+              {/* Totals */}
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="font-medium">
+                    ₹{subtotal.toLocaleString()}
+                  </span>
+                </div>
+
+                {discountApplied && (
+                  <div className="flex justify-between text-chart-2">
+                    <span>Discount</span>
+                    <span>−₹{discountAmount.toLocaleString()}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    Taxes ({(taxRate * 100).toFixed(0)}%)
+                  </span>
+                  <span className="font-medium">
+                    ₹{taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+
+                <hr className="border-border" />
+
+                <div className="flex justify-between text-base font-bold">
+                  <span>Total</span>
+                  <span>
+                    ₹{total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+
+              {/* Checkout */}
+              <Button
+                size="lg"
+                className="mt-2 w-full"
+                onClick={handleCheckout}
+              >
+                Checkout
+              </Button>
+
+              <p className="text-center text-xs text-muted-foreground">
+                Terms and conditions apply
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}

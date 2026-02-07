@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Search, SlidersHorizontal, ShoppingCart, Star } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -11,89 +12,17 @@ import {
   CardFooter,
   CardHeader,
 } from "@/components/ui/card";
+import { useCart } from "@/lib/cart-context";
+import { PRODUCTS, CATEGORIES, PRODUCT_TYPES } from "@/lib/products-data";
 
-/* ------------------------------------------------------------------ */
-/*  Mock data — replace with real API calls later                     */
-/* ------------------------------------------------------------------ */
-
-const CATEGORIES = ["All Products", "SaaS", "Support", "Hosting", "Add-ons"];
-
-const PRODUCTS = [
-  {
-    id: "1",
-    name: "Subly Pro",
-    category: "SaaS",
-    image: "/products/placeholder1.svg",
-    monthlyPrice: 1200,
-    yearlyPrice: 12000,
-    rating: 4.8,
-    tag: "Popular",
-  },
-  {
-    id: "2",
-    name: "Subly Starter",
-    category: "SaaS",
-    image: "/products/placeholder2.svg",
-    monthlyPrice: 499,
-    yearlyPrice: 4990,
-    rating: 4.5,
-    tag: null,
-  },
-  {
-    id: "3",
-    name: "Priority Support",
-    category: "Support",
-    image: "/products/placeholder3.svg",
-    monthlyPrice: 299,
-    yearlyPrice: 2990,
-    rating: 4.9,
-    tag: "New",
-  },
-  {
-    id: "4",
-    name: "Cloud Hosting",
-    category: "Hosting",
-    image: "/products/placeholder4.svg",
-    monthlyPrice: 799,
-    yearlyPrice: 7990,
-    rating: 4.6,
-    tag: null,
-  },
-  {
-    id: "5",
-    name: "Analytics Add-on",
-    category: "Add-ons",
-    image: "/products/placeholder5.svg",
-    monthlyPrice: 199,
-    yearlyPrice: 1990,
-    rating: 4.3,
-    tag: null,
-  },
-  {
-    id: "6",
-    name: "Enterprise Suite",
-    category: "SaaS",
-    image: "/products/placeholder6.svg",
-    monthlyPrice: 2499,
-    yearlyPrice: 24990,
-    rating: 4.9,
-    tag: "Best Value",
-  },
-];
-
-/* ------------------------------------------------------------------ */
-/*  Home / Shop page                                                  */
-/* ------------------------------------------------------------------ */
-
-export default function HomePage() {
+export default function ShopPage() {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("All Products");
   const [sortAsc, setSortAsc] = useState(true);
+  const { addItem } = useCart();
 
   const filtered = PRODUCTS.filter((p) => {
-    const matchesSearch = p.name
-      .toLowerCase()
-      .includes(search.toLowerCase());
+    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
     const matchesCategory =
       activeCategory === "All Products" || p.category === activeCategory;
     return matchesSearch && matchesCategory;
@@ -107,9 +36,7 @@ export default function HomePage() {
     <div className="min-h-screen">
       {/* ── Hero ─────────────────────────────────────────── */}
       <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-accent/10 px-4 pb-16 pt-20 sm:px-6 lg:px-8">
-        {/* subtle grid pattern */}
         <div className="pointer-events-none absolute inset-0 bg-[url('/grid.svg')] bg-center opacity-[0.03] dark:opacity-[0.06]" />
-
         <div className="relative mx-auto max-w-4xl text-center">
           <Badge variant="secondary" className="mb-4">
             Subscription Management Made Easy
@@ -122,14 +49,12 @@ export default function HomePage() {
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
             Browse products, pick a plan, and manage everything from one place.
-            Flexible billing, transparent pricing, zero hassle.
           </p>
         </div>
       </section>
 
       {/* ── Filters & Search ─────────────────────────────── */}
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Search + Sort row */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -140,7 +65,6 @@ export default function HomePage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-
           <Button
             variant="outline"
             size="sm"
@@ -189,20 +113,35 @@ export default function HomePage() {
                   </Badge>
                 )}
 
-                <CardHeader className="p-0">
-                  <div className="flex h-48 items-center justify-center bg-muted/50">
-                    {/* Placeholder product image */}
-                    <div className="flex h-24 w-24 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-accent/30 text-3xl font-bold text-primary">
-                      {product.name.charAt(0)}
+                <Link href={`/shop/${product.id}`}>
+                  <CardHeader className="p-0">
+                    <div className="flex h-48 items-center justify-center bg-muted/50 transition-colors group-hover:bg-muted/70">
+                      <div className="flex h-24 w-24 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-accent/30 text-3xl font-bold text-primary">
+                        {product.name.charAt(0)}
+                      </div>
                     </div>
-                  </div>
-                </CardHeader>
+                  </CardHeader>
+                </Link>
 
                 <CardContent className="p-5">
-                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    {product.category}
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      {product.category}
+                    </p>
+                    <span className="text-muted-foreground/40">·</span>
+                    <p className="text-xs text-muted-foreground">
+                      {PRODUCT_TYPES[product.type] ?? product.type}
+                    </p>
+                  </div>
+                  <Link href={`/shop/${product.id}`}>
+                    <h3 className="mt-1 text-lg font-semibold hover:underline">
+                      {product.name}
+                    </h3>
+                  </Link>
+
+                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                    {product.description}
                   </p>
-                  <h3 className="mt-1 text-lg font-semibold">{product.name}</h3>
 
                   <div className="mt-2 flex items-center gap-1">
                     <Star className="h-3.5 w-3.5 fill-chart-4 text-chart-4" />
@@ -213,17 +152,52 @@ export default function HomePage() {
 
                   <div className="mt-3 flex items-baseline gap-1">
                     <span className="text-2xl font-bold">
-                      ₹{product.monthlyPrice}
+                      ₹{product.monthlyPrice.toLocaleString()}
                     </span>
                     <span className="text-sm text-muted-foreground">/month</span>
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    or ₹{product.yearlyPrice}/year
+                    or ₹{product.yearlyPrice.toLocaleString()}/year
+                    {product.recurringPlan && (
+                      <span className="ml-1">
+                        · {product.recurringPlan.billingPeriod.toLowerCase()} plan
+                      </span>
+                    )}
                   </p>
+
+                  {product.variants.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {product.variants.slice(0, 3).map((v) => (
+                        <Badge
+                          key={`${v.attribute}-${v.value}`}
+                          variant="outline"
+                          className="text-[10px]"
+                        >
+                          {v.attribute}: {v.value}
+                          {v.extraPrice > 0 && ` +₹${v.extraPrice}`}
+                        </Badge>
+                      ))}
+                      {product.variants.length > 3 && (
+                        <Badge variant="outline" className="text-[10px]">
+                          +{product.variants.length - 3} more
+                        </Badge>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
 
                 <CardFooter className="px-5 pb-5 pt-0">
-                  <Button className="w-full gap-2">
+                  <Button
+                    className="w-full gap-2"
+                    onClick={() =>
+                      addItem({
+                        product,
+                        quantity: 1,
+                        plan: "Monthly",
+                        selectedVariant: null,
+                      })
+                    }
+                  >
                     <ShoppingCart className="h-4 w-4" />
                     Add to Cart
                   </Button>
@@ -234,7 +208,6 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* ── Footer ───────────────────────────────────────── */}
       <footer className="border-t border-border bg-muted/30 py-8 text-center text-sm text-muted-foreground">
         © {new Date().getFullYear()} Subly — Subscription Management System
       </footer>

@@ -10,22 +10,19 @@ import {
   LogOut,
   ClipboardList,
   UserCircle,
-  LogIn,
-  UserPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/lib/auth-context"; 
+import { useCart } from "@/lib/cart-context";
 
 export function Navbar() {
   const [accountOpen, setAccountOpen] = useState(false);
-  const { user, loading, logout } = useAuth();
+  const { itemCount } = useCart();
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
           <ShoppingBag className="h-6 w-6 text-primary" />
@@ -47,78 +44,59 @@ export function Navbar() {
           <ThemeToggle />
 
           {/* Cart */}
-          <Button variant="ghost" size="icon" className="relative h-9 w-9">
-            <ShoppingCart className="h-4 w-4" />
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-              0
-            </span>
+          <Button variant="ghost" size="icon" className="relative h-9 w-9" asChild>
+            <Link href="/cart">
+              <ShoppingCart className="h-4 w-4" />
+              {itemCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                  {itemCount > 9 ? "9+" : itemCount}
+                </span>
+              )}
+            </Link>
           </Button>
 
-          {/* Auth: Login/Sign up when signed out, My Account when signed in */}
-          {loading ? (
-            <div className="h-9 w-24 animate-pulse rounded-md bg-muted" />
-          ) : user ? (
-            <div className="relative">
-              <Button
-                variant="ghost"
-                className="flex items-center gap-1.5 text-sm"
-                onClick={() => setAccountOpen(!accountOpen)}
-                onBlur={() => setTimeout(() => setAccountOpen(false), 150)}
-              >
-                <User className="h-4 w-4" />
-                <span className="hidden sm:inline">My Account</span>
-                <ChevronDown
-                  className={cn(
-                    "h-3 w-3 transition-transform",
-                    accountOpen && "rotate-180"
-                  )}
-                />
-              </Button>
+          {/* My Account dropdown */}
+          <div className="relative">
+            <Button
+              variant="ghost"
+              className="flex items-center gap-1.5 text-sm"
+              onClick={() => setAccountOpen(!accountOpen)}
+              onBlur={() => setTimeout(() => setAccountOpen(false), 150)}
+            >
+              <User className="h-4 w-4" />
+              <span className="hidden sm:inline">My Account</span>
+              <ChevronDown
+                className={cn(
+                  "h-3 w-3 transition-transform",
+                  accountOpen && "rotate-180"
+                )}
+              />
+            </Button>
 
-              {accountOpen && (
-                <div className="absolute right-0 mt-2 w-48 rounded-lg border border-border bg-popover p-1 shadow-lg">
-                  <Link
-                    href="/profile"
-                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-popover-foreground transition-colors hover:bg-accent"
-                  >
-                    <UserCircle className="h-4 w-4" />
-                    My Profile
-                  </Link>
-                  <Link
-                    href="/orders"
-                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-popover-foreground transition-colors hover:bg-accent"
-                  >
-                    <ClipboardList className="h-4 w-4" />
-                    My Orders
-                  </Link>
-                  <hr className="my-1 border-border" />
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10"
-                    onClick={() => logout()}
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Sign Out
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex items-center gap-1 sm:gap-2">
-              <Button variant="ghost" size="sm" className="gap-1.5" asChild>
-                <Link href="/login">
-                  <LogIn className="h-4 w-4" />
-                  <span className="hidden sm:inline">Login</span>
+            {accountOpen && (
+              <div className="absolute right-0 mt-2 w-48 rounded-lg border border-border bg-popover p-1 shadow-lg">
+                <Link
+                  href="/profile"
+                  className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-popover-foreground transition-colors hover:bg-accent"
+                >
+                  <UserCircle className="h-4 w-4" />
+                  My Profile
                 </Link>
-              </Button>
-              <Button size="sm" className="gap-1.5" asChild>
-                <Link href="/signup">
-                  <UserPlus className="h-4 w-4" />
-                  <span className="hidden sm:inline">Sign up</span>
+                <Link
+                  href="/orders"
+                  className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-popover-foreground transition-colors hover:bg-accent"
+                >
+                  <ClipboardList className="h-4 w-4" />
+                  My Orders
                 </Link>
-              </Button>
-            </div>
-          )}
+                <hr className="my-1 border-border" />
+                <button className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10">
+                  <LogOut className="h-4 w-4" />
+                  Sign Out
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </nav>

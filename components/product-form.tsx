@@ -40,7 +40,6 @@ interface Tax {
 
 interface RecurringPlan {
   id?: string;
-  price: number;
   billingPeriod: string;
   startDate: string;
   endDate?: string;
@@ -69,16 +68,8 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
   const [imageUrl, setImageUrl] = useState("");
   const [imageAlt, setImageAlt] = useState("");
 
-  // Recurring Plans management
+  // Recurring Plans are now managed separately - products link to plans
   const [recurringPlans, setRecurringPlans] = useState<RecurringPlan[]>([]);
-  const [planPrice, setPlanPrice] = useState("");
-  const [billingPeriod, setBillingPeriod] = useState("MONTHLY");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [autoClose, setAutoClose] = useState(false);
-  const [closeable, setCloseable] = useState(true);
-  const [renewable, setRenewable] = useState(true);
-  const [pausable, setPausable] = useState(false);
 
   const [variants, setVariants] = useState<Variant[]>([]);
   const [variantAttribute, setVariantAttribute] = useState("");
@@ -144,32 +135,8 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
   };
 
   const addRecurringPlan = () => {
-    if (!planPrice || !billingPeriod || !startDate) {
-      setError("Please fill in all required recurring plan fields");
-      return;
-    }
-
-    const newPlan: RecurringPlan = {
-      price: parseFloat(planPrice),
-      billingPeriod,
-      startDate,
-      endDate: endDate || undefined,
-      autoClose,
-      closeable,
-      renewable,
-      pausable,
-    };
-
-    setRecurringPlans([...recurringPlans, newPlan]);
-    setPlanPrice("");
-    setBillingPeriod("MONTHLY");
-    setStartDate("");
-    setEndDate("");
-    setAutoClose(false);
-    setCloseable(true);
-    setRenewable(true);
-    setPausable(false);
-    setError(null);
+    // Recurring plans are now managed separately in /internal/configuration/recurring-plans
+    setError("Recurring plans are now managed separately. Please go to Configuration > Recurring Plans.");
   };
 
   const removeRecurringPlan = (index: number) => {
@@ -504,10 +471,10 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
         </CardContent>
       </Card>
 
-      {/* Recurring Plans Card */}
+      {/* Recurring Plans Note */}
       <Card>
         <CardHeader>
-          <CardTitle>Recurring Plans (Optional)</CardTitle>
+          <CardTitle>Recurring Plans</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-4 rounded-lg border border-dashed p-4">
@@ -618,9 +585,9 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
 
           {/* List of added recurring plans */}
           {recurringPlans.length > 0 && (
-            <div className="space-y-2">
+            <div className="mt-4 space-y-2">
               <Label className="text-base font-semibold">
-                Added Plans ({recurringPlans.length})
+                Associated Plans ({recurringPlans.length})
               </Label>
               <div className="space-y-2">
                 {recurringPlans.map((plan, index) => (
@@ -636,14 +603,6 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
                         ₹{plan.price.toFixed(2)}
                       </span>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeRecurringPlan(index)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
                   </div>
                 ))}
               </div>

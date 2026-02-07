@@ -104,21 +104,22 @@ model RefreshToken {
 // ─────────────────────────────────────────────────────────
 
 model Product {
-  id            String      @id @default(cuid())
-  name          String
-  description   String? // Product description
-  type          ProductType @default(SERVICE)
-  salesPrice    Decimal     @db.Decimal(10, 2)
-  costPrice     Decimal     @db.Decimal(10, 2)
-  tagId         String?
-  taxId         String? // Tax bracket this product belongs to
-  averageRating Decimal     @default(0) @db.Decimal(3, 2) // 0-5 rating
+  id               String      @id @default(cuid())
+  name             String
+  description      String? // Product description
+  type             ProductType @default(SERVICE)
+  salesPrice       Decimal     @db.Decimal(10, 2)
+  costPrice        Decimal     @db.Decimal(10, 2)
+  tagId            String?
+  taxId            String? // Tax bracket this product belongs to
+  recurringPlanId  String?
+  averageRating    Decimal     @default(0) @db.Decimal(3, 2) // 0-5 rating
 
   variants               Variant[]
   tag                    ProductTag?             @relation(fields: [tagId], references: [id])
   tax                    Tax?                    @relation(fields: [taxId], references: [id])
+  recurringPlan          RecurringPlan?          @relation(fields: [recurringPlanId], references: [id])
   images                 ProductImage[]
-  recurringPlans         RecurringPlan[]
   subscriptionLines      SubscriptionLine[]
   invoiceLines           InvoiceLine[]
   quotationTemplateLines QuotationTemplateLine[]
@@ -189,13 +190,13 @@ model RecurringPlan {
   renewable Boolean @default(true)
   pausable  Boolean @default(false)
 
+  products           Product[]
   subscriptions      Subscription[]
   quotationTemplates QuotationTemplate[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([productId])
   @@map("recurring_plans")
 }
 

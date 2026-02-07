@@ -90,7 +90,7 @@ export default function CartPage() {
             ? item.plan === "Monthly"
               ? (item.product.monthlyPrice ?? Number(item.product.salesPrice) ?? 0)
               : (item.product.yearlyPrice ?? Number(item.product.salesPrice) ?? 0)
-            : Number(item.plan?.price) || Number(item.product.salesPrice) || 0;
+            : Number(item.product.salesPrice) || 0;
         const extra = item.selectedVariant?.extraPrice ?? 0;
         const unitPrice = base + extra;
         const planLabel =
@@ -209,14 +209,14 @@ export default function CartPage() {
                       : typeof item.plan === "string"
                         ? item.plan
                         : item.plan?.billingPeriod
-                          ? `₹${Number(item.plan.price).toLocaleString()}/${item.plan.billingPeriod.toLowerCase()}`
+                          ? `Plan (${item.plan.billingPeriod?.toLowerCase()})`
                           : "One-time";
                   const planPrice =
                     typeof item.plan === "string"
                       ? item.plan === "Monthly"
                         ? (item.product.monthlyPrice ?? Number(item.product.salesPrice) ?? 0)
                         : (item.product.yearlyPrice ?? Number(item.product.salesPrice) ?? 0)
-                      : Number(item.plan?.price) || Number(item.product.salesPrice) || 0;
+                      : Number(item.product.salesPrice) || 0;
                   const extra = item.selectedVariant?.extraPrice ?? 0;
                   const lineTotal = (planPrice + extra) * item.quantity;
 

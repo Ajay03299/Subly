@@ -73,8 +73,6 @@ interface PlanSubscription {
 
 interface RecurringPlan {
   id: string;
-  productId: string;
-  price: number;
   billingPeriod: string;
   autoClose: boolean;
   closeable: boolean;
@@ -83,7 +81,7 @@ interface RecurringPlan {
   startDate: string;
   endDate: string | null;
   createdAt: string;
-  product?: PlanProduct;
+  products?: PlanProduct[];
   subscriptions?: PlanSubscription[];
 }
 
@@ -147,8 +145,7 @@ export default function RecurringPlansPage() {
   const [activePlan, setActivePlan] = useState<RecurringPlan | null>(null);
 
   /* ── form state ─────────────────────────────────────── */
-  const [formProductId, setFormProductId] = useState("");
-  const [formPrice, setFormPrice] = useState("");
+
   const [formBillingPeriod, setFormBillingPeriod] = useState("MONTHLY");
   const [formAutoClose, setFormAutoClose] = useState(false);
   const [formCloseable, setFormCloseable] = useState(true);
@@ -220,8 +217,6 @@ export default function RecurringPlansPage() {
 
   /* ── populate form from plan ────────────────────────── */
   function populateForm(plan: RecurringPlan) {
-    setFormProductId(plan.productId);
-    setFormPrice(String(plan.price));
     setFormBillingPeriod(plan.billingPeriod);
     setFormAutoClose(plan.autoClose);
     setFormCloseable(plan.closeable);
@@ -236,8 +231,6 @@ export default function RecurringPlansPage() {
   }
 
   function resetForm() {
-    setFormProductId("");
-    setFormPrice("");
     setFormBillingPeriod("MONTHLY");
     setFormAutoClose(false);
     setFormCloseable(true);
@@ -281,13 +274,7 @@ export default function RecurringPlansPage() {
 
   /* ── save (create / update) ─────────────────────────── */
   async function handleSave() {
-    if (!formProductId) return setError("Product is required");
-    if (!formPrice || isNaN(parseFloat(formPrice)))
-      return setError("Valid price is required");
-
     const payload = {
-      productId: formProductId,
-      price: parseFloat(formPrice),
       billingPeriod: formBillingPeriod,
       autoClose: formAutoClose,
       closeable: formCloseable,
@@ -379,8 +366,8 @@ export default function RecurringPlansPage() {
   /* ── filtered list ──────────────────────────────────── */
   const filtered = plans.filter(
     (p) =>
-      p.product?.name?.toLowerCase().includes(search.toLowerCase()) ||
-      p.billingPeriod.toLowerCase().includes(search.toLowerCase())
+      p.billingPeriod.toLowerCase().includes(search.toLowerCase()) ||
+      p.products?.some((prod) => prod.name.toLowerCase().includes(search.toLowerCase()))
   );
 
   const isDetail = view !== "list" && view !== "create";
@@ -401,13 +388,13 @@ export default function RecurringPlansPage() {
             <h1 className="text-2xl font-bold tracking-tight">
               {isCreate
                 ? "New Recurring Plan"
-                : activePlan?.product?.name
-                  ? `${activePlan.product.name} — ${BILLING_PERIODS.find(b => b.value === activePlan.billingPeriod)?.label || activePlan.billingPeriod}`
-                  : "Recurring Plan"}
+                : "Recurring Plan"}
             </h1>
             {!isCreate && activePlan && (
               <p className="text-sm text-muted-foreground">
-                Product: {activePlan.product?.name} &middot;{" "}
+                {activePlan.products && activePlan.products.length > 0
+                  ? `${activePlan.products.length} product${activePlan.products.length !== 1 ? 's' : ''}`
+                  : 'No products'} &middot;{" "}
                 {BILLING_PERIODS.find(
                   (b) => b.value === activePlan.billingPeriod
                 )?.label || activePlan.billingPeriod}
@@ -441,49 +428,6 @@ export default function RecurringPlansPage() {
                 <CardTitle className="text-base">Plan Details</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-5 sm:grid-cols-2">
-                {/* Product */}
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">
-                    Product <span className="text-destructive">*</span>
-                  </label>
-                  <Select
-                    value={formProductId || "placeholder"}
-                    onValueChange={(v) =>
-                      setFormProductId(v === "placeholder" ? "" : v)
-                    }
-                    disabled={isDetail && !!activePlan}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select product..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="placeholder" disabled>
-                        Select product...
-                      </SelectItem>
-                      {products.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Price */}
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">
-                    Price <span className="text-destructive">*</span>
-                  </label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formPrice}
-                    onChange={(e) => setFormPrice(e.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
-
                 {/* Billing Period */}
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">Billing Period</label>
@@ -528,9 +472,6 @@ export default function RecurringPlansPage() {
                     onChange={(e) => setFormEndDate(e.target.value)}
                   />
                 </div>
-
-                {/* Spacer for grid alignment */}
-                <div />
 
                 {/* ── Checkboxes ────────────────────────── */}
                 <div className="sm:col-span-2">
@@ -599,12 +540,12 @@ export default function RecurringPlansPage() {
             </div>
 
             {/* ── Product Info ────────────────────────────── */}
-            {isDetail && activePlan?.product && (
+            {isDetail && activePlan?.products && activePlan.products.length > 0 && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-base">
                     <Package className="h-4 w-4" />
-                    Product
+                    Products ({activePlan.products.length})
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -612,62 +553,65 @@ export default function RecurringPlansPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Product</TableHead>
+                        <TableHead>Type</TableHead>
                         <TableHead>Variant</TableHead>
-                        <TableHead className="text-right">Price</TableHead>
+                        <TableHead className="text-right">Product Price</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {/* Main product row */}
-                      <TableRow>
-                        <TableCell className="font-medium">
-                          {activePlan.product.name}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          —
-                        </TableCell>
-                        <TableCell className="text-right">
-                          ₹{Number(activePlan.price).toFixed(2)} /{" "}
-                          {BILLING_PERIODS.find(
-                            (b) => b.value === activePlan.billingPeriod
-                          )?.label.toLowerCase() || "period"}
-                        </TableCell>
-                      </TableRow>
-                      {/* Variant rows */}
-                      {activePlan.product.variants?.map((v) => (
-                        <TableRow key={v.id}>
-                          <TableCell className="text-muted-foreground">
-                            {activePlan.product!.name}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">
-                              {v.attribute}: {v.value}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            ₹
-                            {(
-                              Number(activePlan.price) + Number(v.extraPrice)
-                            ).toFixed(2)}{" "}
-                            /{" "}
-                            {BILLING_PERIODS.find(
-                              (b) => b.value === activePlan.billingPeriod
-                            )?.label.toLowerCase() || "period"}
-                          </TableCell>
-                        </TableRow>
+                      {activePlan.products.map((product) => (
+                        <>
+                          {/* Main product row */}
+                          <TableRow key={product.id}>
+                            <TableCell className="font-medium">
+                              {product.name}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{product.type}</Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              —
+                            </TableCell>
+                            <TableCell className="text-right">
+                              ₹{Number(product.salesPrice).toFixed(2)} /{" "}
+                              {BILLING_PERIODS.find(
+                                (b) => b.value === activePlan.billingPeriod
+                              )?.label.toLowerCase() || "period"}
+                            </TableCell>
+                          </TableRow>
+                          {/* Variant rows */}
+                          {product.variants?.map((v) => (
+                            <TableRow key={v.id}>
+                              <TableCell className="text-muted-foreground pl-8">
+                                {product.name}
+                              </TableCell>
+                              <TableCell></TableCell>
+                              <TableCell>
+                                <Badge variant="outline">
+                                  {v.attribute}: {v.value}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                ₹{(Number(product.salesPrice) + Number(v.extraPrice)).toFixed(2)} /{" "}
+                                {BILLING_PERIODS.find(
+                                  (b) => b.value === activePlan.billingPeriod
+                                )?.label.toLowerCase() || "period"}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </>
                       ))}
-                      {(!activePlan.product.variants ||
-                        activePlan.product.variants.length === 0) && (
-                        <TableRow>
-                          <TableCell
-                            colSpan={3}
-                            className="text-center text-xs text-muted-foreground"
-                          >
-                            No variants for this product
-                          </TableCell>
-                        </TableRow>
-                      )}
                     </TableBody>
                   </Table>
+                </CardContent>
+              </Card>
+            )}
+
+            {isDetail && (!activePlan?.products || activePlan.products.length === 0) && (
+              <Card>
+                <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                  <Package className="mx-auto mb-2 h-8 w-8 opacity-40" />
+                  No products are associated with this plan yet.
                 </CardContent>
               </Card>
             )}
@@ -818,8 +762,7 @@ export default function RecurringPlansPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Product</TableHead>
-                <TableHead>Price</TableHead>
+                <TableHead>Products</TableHead>
                 <TableHead>Billing</TableHead>
                 <TableHead className="text-center">Options</TableHead>
                 <TableHead className="text-center">Subs</TableHead>
@@ -832,9 +775,10 @@ export default function RecurringPlansPage() {
                   className="cursor-pointer"
                   onClick={() => openPlan(plan.id)}
                 >
-                  <TableCell className="font-medium">{plan.product?.name || "—"}</TableCell>
-                  <TableCell className="tabular-nums">
-                    ₹{Number(plan.price).toFixed(2)}
+                  <TableCell className="font-medium">
+                    {plan.products && plan.products.length > 0 
+                      ? plan.products.map(p => p.name).join(", ")
+                      : "No products"}
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline">

@@ -272,8 +272,7 @@ export default function ProductsPage() {
     const s = search.toLowerCase();
     return (
       p.name.toLowerCase().includes(s) ||
-      p.type.toLowerCase().includes(s) ||
-      p.recurringPlan?.name?.toLowerCase().includes(s)
+      p.type.toLowerCase().includes(s)
     );
   });
 
@@ -559,7 +558,7 @@ export default function ProductsPage() {
                             <div className="flex flex-wrap gap-1">
                               {product.recurringPlans.slice(0, 1).map((plan) => (
                                 <Badge key={plan.id} variant="outline" className="text-[11px]">
-                                  {plan.name}
+                                  {plan.billingPeriod}
                                 </Badge>
                               ))}
                               {product.recurringPlans.length > 1 && (

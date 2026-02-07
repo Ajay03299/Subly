@@ -743,7 +743,7 @@ export default function SubscriptionsPage() {
                         <TableCell>
                           <span className="text-sm text-muted-foreground">
                             {sub.recurringPlan
-                              ? `₹${Number(sub.recurringPlan.price).toLocaleString()}/${sub.recurringPlan.billingPeriod.toLowerCase()}`
+                              ? `Plan (${sub.recurringPlan.billingPeriod.toLowerCase()})`
                               : "—"}
                           </span>
                         </TableCell>

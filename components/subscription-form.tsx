@@ -65,7 +65,6 @@ interface Product {
 
 interface RecurringPlan {
   id: string;
-  price: number;
   billingPeriod: string;
   autoClose: boolean;
   closeable: boolean;
@@ -361,17 +360,17 @@ export function SubscriptionForm({
     const product = products.find((p) => p.id === newLineProductId);
     if (!product) return;
 
-    // Use recurring plan price if one is selected, otherwise use product salesPrice
+    // Use product salesPrice (plan no longer has price)
     const selectedPlan = plansForProduct.find((p) => p.id === newLinePlanId);
     const qty = parseInt(newLineQty) || 1;
-    const price = selectedPlan ? Number(selectedPlan.price) : Number(product.salesPrice);
+    const price = Number(product.salesPrice);
     const discount = parseFloat(newLineDiscount) || 0;
     const taxRate = parseFloat(newLineTaxRate) || 0;
     const discounted = price * (1 - discount / 100);
     const amount = qty * discounted * (1 + taxRate / 100);
 
     const planSuffix = selectedPlan
-      ? ` (₹${Number(selectedPlan.price).toFixed(2)}/${selectedPlan.billingPeriod.toLowerCase()})`
+      ? ` (Plan — ${selectedPlan.billingPeriod.toLowerCase()})`
       : "";
 
     // Also set the subscription-level recurringPlanId if a plan was chosen
@@ -823,8 +822,7 @@ export function SubscriptionForm({
                         </SelectItem>
                         {plansForProduct.map((plan) => (
                           <SelectItem key={plan.id} value={plan.id}>
-                            ₹{Number(plan.price).toFixed(2)} /{" "}
-                            {plan.billingPeriod.toLowerCase()}
+                            Plan — {plan.billingPeriod.toLowerCase()}
                           </SelectItem>
                         ))}
                       </SelectContent>

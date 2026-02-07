@@ -15,7 +15,7 @@ export async function GET(
         tag: true,
         tax: true,
         variants: true,
-        recurringPlans: true,
+        recurringPlan: true,
       },
     });
 

@@ -41,7 +41,7 @@ export async function GET(
   const plan = await prisma.recurringPlan.findUnique({
     where: { id },
     include: {
-      product: {
+      products: {
         select: {
           id: true,
           name: true,
@@ -87,7 +87,6 @@ export async function PUT(
     return NextResponse.json({ error: "Plan not found" }, { status: 404 });
 
   const data: Record<string, unknown> = {};
-  if (body.price !== undefined) data.price = parseFloat(body.price);
   if (body.billingPeriod !== undefined) data.billingPeriod = body.billingPeriod;
   if (body.autoClose !== undefined) data.autoClose = Boolean(body.autoClose);
   if (body.closeable !== undefined) data.closeable = Boolean(body.closeable);
@@ -101,7 +100,7 @@ export async function PUT(
     where: { id },
     data,
     include: {
-      product: { select: { id: true, name: true, type: true, salesPrice: true } },
+      products: { select: { id: true, name: true, type: true, salesPrice: true } },
       subscriptions: {
         select: {
           id: true,

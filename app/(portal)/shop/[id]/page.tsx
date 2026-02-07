@@ -49,7 +49,6 @@ interface Variant {
 
 interface RecurringPlan {
   id: string;
-  price: number;
   billingPeriod: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
   closeable: boolean;
   renewable: boolean;
@@ -67,7 +66,7 @@ interface Product {
   averageRating: number;
   images: ProductImage[];
   variants: Variant[];
-  recurringPlans: RecurringPlan[];
+  recurringPlan: RecurringPlan | null;
   tax?: { id: string; name: string; rate: number } | null;
 }
 
@@ -114,7 +113,6 @@ export default function ProductPage() {
 
   /* ── local state ────────────────────────────────────── */
   const [selectedImage, setSelectedImage] = useState(0);
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
 
   // Per-attribute variant selection
@@ -139,10 +137,6 @@ export default function ProductPage() {
         const data = await response.json();
         const productData: Product = data.product || data;
         setProduct(productData);
-        // Set first recurring plan as default
-        if (productData.recurringPlans?.length > 0) {
-          setSelectedPlan(productData.recurringPlans[0].id);
-        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load product");
       } finally {
@@ -158,8 +152,6 @@ export default function ProductPage() {
     () => (product?.variants ? groupVariants(product.variants) : new Map()),
     [product]
   );
-
-  const selectedPlanData = product?.recurringPlans.find(p => p.id === selectedPlan);
 
   if (loading) {
     return (
@@ -188,10 +180,9 @@ export default function ProductPage() {
   }
 
   /* ── pricing ───────────────────────────────────────── */
-  const hasPlans = product.recurringPlans.length > 0;
-  const basePrice = selectedPlanData
-    ? Number(selectedPlanData.price)
-    : Number(product.salesPrice);
+  const hasPlans = product.recurringPlan !== null;
+  const selectedPlanData = hasPlans ? product.recurringPlan : null;
+  const basePrice = Number(product.salesPrice);
 
   const totalExtraPrice = Object.values(selectedVariants).reduce(
     (sum, v) => sum + v.extraPrice,
@@ -353,7 +344,7 @@ export default function ProductPage() {
                 >
                   {product.recurringPlans.map((plan) => (
                     <option key={plan.id} value={plan.id}>
-                      ₹{plan.price}/{BILLING_PERIOD_LABELS[plan.billingPeriod]}
+                      {plan.name} - ₹{plan.price}/{BILLING_PERIOD_LABELS[plan.billingPeriod]}
                     </option>
                   ))}
                 </select>
@@ -367,7 +358,7 @@ export default function ProductPage() {
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm font-semibold">
                   <CalendarDays className="h-4 w-4 text-primary" />
-                  Plan: ₹{Number(selectedPlanData.price).toLocaleString()}/{BILLING_PERIOD_LABELS[selectedPlanData.billingPeriod].toLowerCase()}
+                  Plan: {selectedPlanData.name}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">

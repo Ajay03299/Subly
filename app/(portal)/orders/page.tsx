@@ -163,7 +163,7 @@ export default function MyOrdersPage() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {sub.recurringPlan
-                        ? `₹${Number(sub.recurringPlan.price).toLocaleString()}/${sub.recurringPlan.billingPeriod.toLowerCase()}`
+                        ? `Plan (${sub.recurringPlan.billingPeriod.toLowerCase()})`
                         : "—"}
                     </TableCell>
                     <TableCell>

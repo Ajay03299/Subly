@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       },
       include: {
         variants: true,
-        recurringPlans: true,
+        recurringPlan: true,
         tag: true,
           tax: true,
         images: true,
@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
     const products = await prisma.product.findMany({
       include: {
         variants: true,
-        recurringPlans: true,
+        recurringPlan: true,
         tag: true,
         images: true,
       },

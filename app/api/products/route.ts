@@ -9,10 +9,9 @@ export async function GET(request: NextRequest) {
         images: true,
         tax: true,
         tag: true,
-        recurringPlans: {
+        recurringPlan: {
           select: {
             id: true,
-            price: true,
             billingPeriod: true,
             autoClose: true,
             closeable: true,

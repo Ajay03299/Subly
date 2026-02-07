@@ -22,7 +22,6 @@ export interface ProductVariant {
 export interface RecurringPlanInfo {
   id: string;
   billingPeriod: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
-  price: number;
   autoClose: boolean;
   closeable: boolean;
   renewable: boolean;
@@ -185,7 +184,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
             ? i.plan === "Monthly"
               ? (i.product.monthlyPrice ?? Number(i.product.salesPrice) ?? 0)
               : (i.product.yearlyPrice ?? Number(i.product.salesPrice) ?? 0)
-            : Number(i.plan?.price) || Number(i.product.salesPrice) || 0;
+            : Number(i.product.salesPrice) || 0;
         const extra = i.selectedVariant?.extraPrice ?? 0;
         return s + (base + extra) * i.quantity;
       }, 0);
@@ -228,7 +227,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         ? i.plan === "Monthly"
           ? (i.product.monthlyPrice ?? Number(i.product.salesPrice) ?? 0)
           : (i.product.yearlyPrice ?? Number(i.product.salesPrice) ?? 0)
-        : Number(i.plan?.price) || Number(i.product.salesPrice) || 0;
+        : Number(i.product.salesPrice) || 0;
     const extra = i.selectedVariant?.extraPrice ?? 0;
     return s + (base + extra) * i.quantity;
   }, 0);
@@ -250,7 +249,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         ? item.plan === "Monthly"
           ? (item.product.monthlyPrice ?? Number(item.product.salesPrice) ?? 0)
           : (item.product.yearlyPrice ?? Number(item.product.salesPrice) ?? 0)
-        : Number(item.plan?.price) || Number(item.product.salesPrice) || 0;
+        : Number(item.product.salesPrice) || 0;
     const extra = item.selectedVariant?.extraPrice ?? 0;
     const lineSubtotal = (base + extra) * item.quantity;
     const rate = Number(item.product.tax?.rate ?? 0);

@@ -414,9 +414,8 @@ export default function OrderDetailPage() {
             {order.recurringPlan && (
               <>
                 <div>
-                  <span className="text-muted-foreground">Billing: </span>
+                  <span className="text-muted-foreground">Billing Period: </span>
                   <span>
-                    {formatCurrency(Number(order.recurringPlan.price))} /{" "}
                     {order.recurringPlan.billingPeriod.toLowerCase()}
                   </span>
                 </div>

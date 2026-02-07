@@ -37,8 +37,6 @@ export async function POST(request: NextRequest) {
     }
 
     const {
-      productId,
-      price,
       billingPeriod,
       autoClose,
       closeable,
@@ -49,30 +47,9 @@ export async function POST(request: NextRequest) {
     } = await request.json();
 
     // Validate required fields
-    if (!productId || price === undefined || !billingPeriod || !startDate) {
+    if (!billingPeriod || !startDate) {
       return NextResponse.json(
-        { error: 'Missing required fields: productId, price, billingPeriod, startDate' },
-        { status: 400 }
-      );
-    }
-
-    // Check if product exists
-    const product = await prisma.product.findUnique({
-      where: { id: productId },
-    });
-
-    if (!product) {
-      return NextResponse.json(
-        { error: 'Product not found' },
-        { status: 404 }
-      );
-    }
-
-    // Validate price
-    const planPrice = parseFloat(price);
-    if (isNaN(planPrice)) {
-      return NextResponse.json(
-        { error: 'Price must be a valid number' },
+        { error: 'Missing required fields: billingPeriod, startDate' },
         { status: 400 }
       );
     }
@@ -80,8 +57,6 @@ export async function POST(request: NextRequest) {
     // Create recurring plan
     const recurringPlan = await prisma.recurringPlan.create({
       data: {
-        productId,
-        price: planPrice,
         billingPeriod,
         autoClose: autoClose || false,
         closeable: closeable !== false, // default true
@@ -132,7 +107,7 @@ export async function GET(request: NextRequest) {
     // Fetch all recurring plans with relations
     const plans = await prisma.recurringPlan.findMany({
       include: {
-        product: { select: { id: true, name: true, type: true, salesPrice: true } },
+        products: { select: { id: true, name: true, type: true, salesPrice: true } },
         subscriptions: {
           select: { id: true, subscriptionNo: true, status: true, totalAmount: true },
           take: 50,

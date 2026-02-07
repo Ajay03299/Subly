@@ -22,6 +22,20 @@ interface Variant {
   extraPrice: number;
 }
 
+interface RecurringPlan {
+  id?: string;
+  name: string;
+  price: number;
+  billingPeriod: string;
+  minimumQuantity: number;
+  startDate: string;
+  endDate?: string;
+  autoClose: boolean;
+  closeable: boolean;
+  renewable: boolean;
+  pausable: boolean;
+}
+
 interface ProductFormProps {
   onSubmit: (data: any) => Promise<void>;
   loading?: boolean;
@@ -33,7 +47,8 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
   const [salesPrice, setSalesPrice] = useState("");
   const [costPrice, setCostPrice] = useState("");
 
-  const [hasRecurring, setHasRecurring] = useState(false);
+  // Recurring Plans management
+  const [recurringPlans, setRecurringPlans] = useState<RecurringPlan[]>([]);
   const [planName, setPlanName] = useState("");
   const [planPrice, setPlanPrice] = useState("");
   const [billingPeriod, setBillingPeriod] = useState("MONTHLY");
@@ -75,6 +90,43 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
     setVariants(variants.filter((_, i) => i !== index));
   };
 
+  const addRecurringPlan = () => {
+    if (!planName || !planPrice || !billingPeriod || !startDate) {
+      setError("Please fill in all required recurring plan fields");
+      return;
+    }
+
+    const newPlan: RecurringPlan = {
+      name: planName,
+      price: parseFloat(planPrice),
+      billingPeriod,
+      minimumQuantity: parseInt(minimumQuantity) || 1,
+      startDate,
+      endDate: endDate || undefined,
+      autoClose,
+      closeable,
+      renewable,
+      pausable,
+    };
+
+    setRecurringPlans([...recurringPlans, newPlan]);
+    setPlanName("");
+    setPlanPrice("");
+    setBillingPeriod("MONTHLY");
+    setMinimumQuantity("1");
+    setStartDate("");
+    setEndDate("");
+    setAutoClose(false);
+    setCloseable(true);
+    setRenewable(true);
+    setPausable(false);
+    setError(null);
+  };
+
+  const removeRecurringPlan = (index: number) => {
+    setRecurringPlans(recurringPlans.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -82,15 +134,6 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
     // Validate basic product fields
     if (!name || !salesPrice || !costPrice) {
       setError("Please fill in all required product fields");
-      return;
-    }
-
-    // Validate recurring plan if enabled
-    if (
-      hasRecurring &&
-      (!planName || !planPrice || !billingPeriod || !startDate)
-    ) {
-      setError("Please fill in all required recurring plan fields");
       return;
     }
 
@@ -103,20 +146,7 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
           costPrice: parseFloat(costPrice),
         },
         variants,
-        recurring: hasRecurring
-          ? {
-              name: planName,
-              price: parseFloat(planPrice),
-              billingPeriod,
-              minimumQuantity: parseInt(minimumQuantity),
-              startDate,
-              endDate: endDate || null,
-              autoClose,
-              closeable,
-              renewable,
-              pausable,
-            }
-          : null,
+        recurringPlans,
       };
 
       await onSubmit(formData);
@@ -276,39 +306,26 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
         </CardContent>
       </Card>
 
-      {/* Recurring Plan Card */}
+      {/* Recurring Plans Card */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Recurring Plan (Optional)</CardTitle>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={hasRecurring}
-                onChange={(e) => setHasRecurring(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300"
-              />
-              <span className="text-sm">Enable Recurring Plan</span>
-            </label>
-          </div>
+          <CardTitle>Recurring Plans (Optional)</CardTitle>
         </CardHeader>
-
-        {hasRecurring && (
-          <CardContent className="space-y-4">
+        <CardContent className="space-y-4">
+          <div className="space-y-4 rounded-lg border border-dashed p-4">
             <div className="space-y-2">
-              <Label htmlFor="planName">Plan Name *</Label>
+              <Label htmlFor="planName">Plan Name</Label>
               <Input
                 id="planName"
                 value={planName}
                 onChange={(e) => setPlanName(e.target.value)}
                 placeholder="e.g., Monthly Subscription"
-                required={hasRecurring}
               />
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="planPrice">Plan Price *</Label>
+                <Label htmlFor="planPrice">Plan Price</Label>
                 <Input
                   id="planPrice"
                   type="number"
@@ -316,17 +333,13 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
                   value={planPrice}
                   onChange={(e) => setPlanPrice(e.target.value)}
                   placeholder="0.00"
-                  required={hasRecurring}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="billingPeriod">Billing Period *</Label>
-                <Select
-                  value={billingPeriod}
-                  onValueChange={setBillingPeriod}
-                >
-                  <SelectTrigger>
+                <Label htmlFor="billingPeriod">Billing Period</Label>
+                <Select value={billingPeriod} onValueChange={setBillingPeriod}>
+                  <SelectTrigger id="billingPeriod">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -341,13 +354,12 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="startDate">Start Date *</Label>
+                <Label htmlFor="startDate">Start Date</Label>
                 <Input
                   id="startDate"
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  required={hasRecurring}
                 />
               </div>
 
@@ -370,56 +382,98 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
                 min="1"
                 value={minimumQuantity}
                 onChange={(e) => setMinimumQuantity(e.target.value)}
-                placeholder="1"
               />
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               <Label>Plan Options</Label>
-              <div className="space-y-2">
+              <div className="flex flex-wrap gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={autoClose}
                     onChange={(e) => setAutoClose(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300"
+                    className="h-4 w-4 rounded"
                   />
                   <span className="text-sm">Auto Close</span>
                 </label>
-
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={closeable}
                     onChange={(e) => setCloseable(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300"
+                    className="h-4 w-4 rounded"
                   />
                   <span className="text-sm">Closeable</span>
                 </label>
-
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={renewable}
                     onChange={(e) => setRenewable(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300"
+                    className="h-4 w-4 rounded"
                   />
                   <span className="text-sm">Renewable</span>
                 </label>
-
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={pausable}
                     onChange={(e) => setPausable(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300"
+                    className="h-4 w-4 rounded"
                   />
                   <span className="text-sm">Pausable</span>
                 </label>
               </div>
             </div>
-          </CardContent>
-        )}
+
+            <Button
+              type="button"
+              onClick={addRecurringPlan}
+              variant="outline"
+              size="sm"
+              className="w-full gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Recurring Plan
+            </Button>
+          </div>
+
+          {/* List of added recurring plans */}
+          {recurringPlans.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-base font-semibold">
+                Added Plans ({recurringPlans.length})
+              </Label>
+              <div className="space-y-2">
+                {recurringPlans.map((plan, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between rounded-lg border border-border bg-muted/50 p-3"
+                  >
+                    <div>
+                      <Badge variant="outline" className="mr-2">
+                        {plan.billingPeriod}
+                      </Badge>
+                      <span className="text-sm font-medium">{plan.name}</span>
+                      <span className="ml-2 text-sm text-muted-foreground">
+                        ₹{plan.price.toFixed(2)}
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeRecurringPlan(index)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
       </Card>
 
       {/* Error Message */}

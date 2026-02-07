@@ -110,11 +110,8 @@ model Product {
   salesPrice Decimal     @db.Decimal(10, 2)
   costPrice  Decimal     @db.Decimal(10, 2)
 
-  // If this product is part of a recurring offering
-  recurringPlanId String?
-  recurringPlan   RecurringPlan? @relation(fields: [recurringPlanId], references: [id], onDelete: SetNull)
-
   variants               Variant[]
+  recurringPlans         RecurringPlan[]
   subscriptionLines      SubscriptionLine[]
   invoiceLines           InvoiceLine[]
   quotationTemplateLines QuotationTemplateLine[]
@@ -147,6 +144,8 @@ model Variant {
 
 model RecurringPlan {
   id              String        @id @default(cuid())
+  productId       String
+  product         Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
   name            String
   price           Decimal       @db.Decimal(10, 2)
   billingPeriod   BillingPeriod
@@ -160,13 +159,13 @@ model RecurringPlan {
   renewable Boolean @default(true)
   pausable  Boolean @default(false)
 
-  products           Product[]
   subscriptions      Subscription[]
   quotationTemplates QuotationTemplate[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([productId])
   @@map("recurring_plans")
 }
 

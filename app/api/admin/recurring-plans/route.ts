@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
     }
 
     const {
+      productId,
       name,
       price,
       billingPeriod,
@@ -50,10 +51,22 @@ export async function POST(request: NextRequest) {
     } = await request.json();
 
     // Validate required fields
-    if (!name || price === undefined || !billingPeriod || !startDate) {
+    if (!productId || !name || price === undefined || !billingPeriod || !startDate) {
       return NextResponse.json(
-        { error: 'Missing required fields: name, price, billingPeriod, startDate' },
+        { error: 'Missing required fields: productId, name, price, billingPeriod, startDate' },
         { status: 400 }
+      );
+    }
+
+    // Check if product exists
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+    });
+
+    if (!product) {
+      return NextResponse.json(
+        { error: 'Product not found' },
+        { status: 404 }
       );
     }
 
@@ -69,6 +82,7 @@ export async function POST(request: NextRequest) {
     // Create recurring plan
     const recurringPlan = await prisma.recurringPlan.create({
       data: {
+        productId,
         name,
         price: planPrice,
         billingPeriod,

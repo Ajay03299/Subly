@@ -120,19 +120,6 @@ export function InternalNavbar() {
               </Link>
             );
           })}
-
-          {/* My Profile tab on far right */}
-          <Link
-            href="/internal/profile"
-            className={cn(
-              "ml-auto whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
-              pathname.startsWith("/internal/profile")
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
-            )}
-          >
-            My Profile
-          </Link>
         </div>
       </div>
     </nav>

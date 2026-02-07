@@ -41,7 +41,6 @@ export async function POST(request: NextRequest) {
       type,
       salesPrice,
       costPrice,
-      recurringPlanId,
     } = await request.json();
 
     // Validate required fields
@@ -70,11 +69,10 @@ export async function POST(request: NextRequest) {
         type,
         salesPrice: sales,
         costPrice: cost,
-        recurringPlanId: recurringPlanId || null,
       },
       include: {
         variants: true,
-        recurringPlan: true,
+        recurringPlans: true,
       },
     });
 
@@ -119,7 +117,7 @@ export async function GET(request: NextRequest) {
     const products = await prisma.product.findMany({
       include: {
         variants: true,
-        recurringPlan: true,
+        recurringPlans: true,
       },
       orderBy: {
         createdAt: 'desc',

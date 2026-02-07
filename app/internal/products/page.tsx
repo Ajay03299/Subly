@@ -42,20 +42,12 @@ interface Product {
   type: string;
   salesPrice: number;
   costPrice: number;
-  recurringPlanId?: string | null;
-  recurringPlan?: {
+  recurringPlans?: Array<{
     id: string;
     name: string;
     price: number;
     billingPeriod: string;
-    minimumQuantity: number;
-    startDate: string;
-    endDate: string | null;
-    autoClose: boolean;
-    closeable: boolean;
-    renewable: boolean;
-    pausable: boolean;
-  } | null;
+  }>;
   variants: Array<{
     id: string;
     attribute: string;
@@ -157,27 +149,8 @@ export default function ProductsPage() {
     try {
       const token = getToken();
 
-      // 1. Create recurring plan if needed
-      let recurringPlanId: string | null = null;
-      if (formData.recurring) {
-        const planRes = await fetch("/api/admin/recurring-plans", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(formData.recurring),
-        });
-        if (!planRes.ok) {
-          const e = await planRes.json();
-          throw new Error(e.error || "Failed to create recurring plan");
-        }
-        const planData = await planRes.json();
-        recurringPlanId = planData.recurringPlan.id;
-      }
-
-      // 2. Create product
-      const prodRes = await fetch("/api/admin/products", {
+      // Create product first (without recurring plans)
+      const productResponse = await fetch("/api/admin/products", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -185,15 +158,37 @@ export default function ProductsPage() {
         },
         body: JSON.stringify({
           ...formData.product,
-          recurringPlanId,
         }),
       });
       if (!prodRes.ok) {
         const e = await prodRes.json();
         throw new Error(e.error || "Failed to create product");
       }
-      const prodData = await prodRes.json();
-      const productId = prodData.product.id;
+
+      const productData = await productResponse.json();
+      const productId = productData.product.id;
+
+      // Create recurring plans
+      if (formData.recurringPlans && formData.recurringPlans.length > 0) {
+        for (const plan of formData.recurringPlans) {
+          const planResponse = await fetch("/api/admin/recurring-plans", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({
+              productId,
+              ...plan,
+            }),
+          });
+
+          if (!planResponse.ok) {
+            const planError = await planResponse.json();
+            throw new Error(planError.error || "Failed to create recurring plan");
+          }
+        }
+      }
 
       // 3. Create variants (form sends all as variants array)
       for (const v of formData.variants) {
@@ -564,16 +559,16 @@ export default function ProductsPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          {product.recurringPlan ? (
-                            <div className="text-sm">
-                              <p className="font-medium">
-                                {product.recurringPlan.name}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                ₹{Number(product.recurringPlan.price).toFixed(2)}{" "}
-                                /{" "}
-                                {product.recurringPlan.billingPeriod.toLowerCase()}
-                              </p>
+                          {product.recurringPlans && product.recurringPlans.length > 0 ? (
+                            <div className="space-y-1">
+                              {product.recurringPlans.map((plan) => (
+                                <div key={plan.id} className="text-sm">
+                                  <p className="font-medium">{plan.name}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {plan.billingPeriod}
+                                  </p>
+                                </div>
+                              ))}
                             </div>
                           ) : (
                             <span className="text-muted-foreground">—</span>

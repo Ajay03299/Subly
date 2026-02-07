@@ -64,6 +64,7 @@ interface Product {
   name: string;
   description: string | null;
   type: "SERVICE" | "CONSUMABLE" | "STORABLE";
+  salesPrice: number;
   tag: ProductTag | null;
   averageRating: number;
   images: ProductImage[];
@@ -189,7 +190,10 @@ export default function ProductPage() {
   }
 
   /* ── pricing ───────────────────────────────────────── */
-  const basePrice = selectedPlanData?.price ?? 0;
+  const hasPlans = product.recurringPlans.length > 0;
+  const basePrice = selectedPlanData
+    ? Number(selectedPlanData.price)
+    : Number(product.salesPrice);
 
   const totalExtraPrice = Object.values(selectedVariants).reduce(
     (sum, v) => sum + v.extraPrice,
@@ -231,11 +235,10 @@ export default function ProductPage() {
   })();
 
   function handleAddToCart() {
-    if (!selectedPlanData) return;
     addItem({
       product,
       quantity,
-      plan: selectedPlanData,
+      plan: selectedPlanData || null,
       selectedVariant: primaryVariant,
     });
     router.push("/cart");
@@ -250,10 +253,14 @@ export default function ProductPage() {
           All Products
         </Link>
         <ChevronRight className="h-3.5 w-3.5" />
-        <Link href={`/shop?tag=${product.tag?.name}`} className="hover:text-foreground transition-colors">
-          {product.tag?.name}
-        </Link>
-        <ChevronRight className="h-3.5 w-3.5" />
+        {product.tag && (
+          <>
+            <span className="hover:text-foreground transition-colors">
+              {product.tag.name}
+            </span>
+            <ChevronRight className="h-3.5 w-3.5" />
+          </>
+        )}
         <span className="text-foreground font-medium">{product.name}</span>
       </nav>
 
@@ -500,7 +507,7 @@ export default function ProductPage() {
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
                 disabled={
                   quantity <=
-                  (product.recurringPlan?.minimumQuantity ?? 1)
+                  (selectedPlanData?.minimumQuantity ?? 1)
                 }
               >
                 <Minus className="h-4 w-4" />
@@ -533,9 +540,15 @@ export default function ProductPage() {
                 </span>
                 <span className="text-2xl font-bold">
                   ₹{unitPrice.toLocaleString()}
-                  <span className="text-sm font-normal text-muted-foreground">
-                    /{selectedPlanData ? BILLING_PERIOD_LABELS[selectedPlanData.billingPeriod].toLowerCase() : "period"}
-                  </span>
+                  {selectedPlanData ? (
+                    <span className="text-sm font-normal text-muted-foreground">
+                      /{BILLING_PERIOD_LABELS[selectedPlanData.billingPeriod].toLowerCase()}
+                    </span>
+                  ) : (
+                    <span className="text-sm font-normal text-muted-foreground">
+                      {" "}one-time
+                    </span>
+                  )}
                 </span>
               </div>
 

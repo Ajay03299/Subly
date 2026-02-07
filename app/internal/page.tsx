@@ -1,15 +1,19 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Shield,
   Users,
   FileText,
   BarChart3,
-  Settings,
   Package,
   CreditCard,
   LogOut,
+  ArrowRight,
+  TrendingUp,
+  Settings,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,305 +27,313 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { useProtectedRoute } from "@/hooks/useProtectedRoute";
 
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
+
+interface DashboardStats {
+  totalUsers: number;
+  activeSubscriptions: number;
+  totalRevenue: number;
+  totalProducts: number;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+function formatCurrency(n: number) {
+  if (n >= 10_000_000) return `₹${(n / 10_000_000).toFixed(1)}Cr`;
+  if (n >= 100_000) return `₹${(n / 100_000).toFixed(1)}L`;
+  if (n >= 1_000) return `₹${(n / 1_000).toFixed(1)}K`;
+  return `₹${n.toFixed(0)}`;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Management card data                                               */
+/* ------------------------------------------------------------------ */
+
+const MANAGEMENT_CARDS = [
+  {
+    title: "Subscriptions",
+    description: "Manage subscription orders",
+    detail: "Create and manage subscription plans, track order lifecycles, and handle renewals.",
+    href: "/internal/subscriptions",
+    icon: FileText,
+    color: "text-blue-600 dark:text-blue-400",
+    bg: "bg-blue-600/10 dark:bg-blue-400/10",
+  },
+  {
+    title: "Products",
+    description: "Manage product catalog",
+    detail: "Create and manage products with recurring plans, pricing, and tags.",
+    href: "/internal/products",
+    icon: Package,
+    color: "text-emerald-600 dark:text-emerald-400",
+    bg: "bg-emerald-600/10 dark:bg-emerald-400/10",
+  },
+  {
+    title: "Reporting",
+    description: "Analytics & insights",
+    detail: "View revenue analytics, subscription trends, and financial reporting.",
+    href: "/internal/reporting",
+    icon: BarChart3,
+    color: "text-violet-600 dark:text-violet-400",
+    bg: "bg-violet-600/10 dark:bg-violet-400/10",
+  },
+  {
+    title: "Users & Contacts",
+    description: "Manage user accounts",
+    detail: "View, edit, and manage all user accounts, roles, and permissions.",
+    href: "/internal/users",
+    icon: Users,
+    color: "text-amber-600 dark:text-amber-400",
+    bg: "bg-amber-600/10 dark:bg-amber-400/10",
+  },
+];
+
+/* ------------------------------------------------------------------ */
+/*  Component                                                          */
+/* ------------------------------------------------------------------ */
+
 export default function InternalPage() {
   const router = useRouter();
   const { user, logout } = useAuth();
-  const { loading } = useProtectedRoute({
+  const { loading: authLoading } = useProtectedRoute({
     requireAuth: true,
     allowedRoles: ["ADMIN", "INTERNAL_USER"],
     redirectTo: "/",
   });
 
-  if (loading || !user) {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  const getToken = useCallback(
+    () => localStorage.getItem("accessToken") ?? "",
+    []
+  );
+
+  /* ── Fetch real stats ─────────────────────────────────────── */
+  useEffect(() => {
+    if (authLoading) return;
+
+    const fetchStats = async () => {
+      try {
+        const headers = { Authorization: `Bearer ${getToken()}` };
+
+        const [usersRes, subsRes, productsRes, reportingRes] =
+          await Promise.all([
+            fetch("/api/admin/users", { headers }),
+            fetch("/api/admin/subscriptions", { headers }),
+            fetch("/api/admin/products", { headers }),
+            fetch("/api/admin/reporting", { headers }),
+          ]);
+
+        const usersData = usersRes.ok ? await usersRes.json() : null;
+        const subsData = subsRes.ok ? await subsRes.json() : null;
+        const productsData = productsRes.ok ? await productsRes.json() : null;
+        const reportingData = reportingRes.ok
+          ? await reportingRes.json()
+          : null;
+
+        const activeSubs =
+          subsData?.subscriptions?.filter(
+            (s: { status: string }) => s.status === "ACTIVE"
+          ).length ?? 0;
+
+        setStats({
+          totalUsers: usersData?.users?.length ?? 0,
+          activeSubscriptions: activeSubs,
+          totalRevenue: reportingData?.overview?.totalRevenue ?? 0,
+          totalProducts: productsData?.products?.length ?? 0,
+        });
+      } catch {
+        // silent — stats will just stay null
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, [authLoading, getToken]);
+
+  /* ── Loading state ────────────────────────────────────────── */
+  if (authLoading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-lg">Loading...</p>
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   const isAdmin = user.role === "ADMIN";
 
+  /* ── Stat cards config ────────────────────────────────────── */
+  const statCards = [
+    {
+      label: "Total Users",
+      value: stats ? stats.totalUsers.toLocaleString() : "—",
+      icon: Users,
+      color: "text-blue-600 dark:text-blue-400",
+      bg: "bg-blue-600/10 dark:bg-blue-400/10",
+    },
+    {
+      label: "Active Subscriptions",
+      value: stats ? stats.activeSubscriptions.toLocaleString() : "—",
+      icon: Package,
+      color: "text-emerald-600 dark:text-emerald-400",
+      bg: "bg-emerald-600/10 dark:bg-emerald-400/10",
+    },
+    {
+      label: "Total Revenue",
+      value: stats ? formatCurrency(stats.totalRevenue) : "—",
+      icon: CreditCard,
+      color: "text-violet-600 dark:text-violet-400",
+      bg: "bg-violet-600/10 dark:bg-violet-400/10",
+    },
+    {
+      label: "Products",
+      value: stats ? stats.totalProducts.toLocaleString() : "—",
+      icon: TrendingUp,
+      color: "text-amber-600 dark:text-amber-400",
+      bg: "bg-amber-600/10 dark:bg-amber-400/10",
+    },
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-8">
+      {/* ── Header ──────────────────────────────────────────── */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
+            <Shield className="h-6 w-6 text-primary-foreground" />
+          </div>
           <div>
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
-                <Shield className="h-6 w-6 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight">
-                  Internal Dashboard
-                </h1>
-                <p className="text-muted-foreground">
-                  Welcome back, {user.email.split("@")[0]}
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Badge variant={isAdmin ? "default" : "secondary"} className="gap-1">
-              <Shield className="h-3 w-3" />
-              {isAdmin ? "Administrator" : "Internal User"}
-            </Badge>
-            <Button variant="outline" className="gap-2" onClick={logout}>
-              <LogOut className="h-4 w-4" />
-              Logout
-            </Button>
+            <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+            <p className="text-muted-foreground">
+              Welcome back, {user.email.split("@")[0]}
+            </p>
           </div>
         </div>
 
-        {/* Quick Stats */}
-        <div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total Users
-              </CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">2,543</div>
-              <p className="text-xs text-muted-foreground">
-                +12% from last month
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Active Subscriptions
-              </CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">1,842</div>
-              <p className="text-xs text-muted-foreground">
-                +8% from last month
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Revenue</CardTitle>
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">₹12.4M</div>
-              <p className="text-xs text-muted-foreground">
-                +18% from last month
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Success Rate
-              </CardTitle>
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">98.5%</div>
-              <p className="text-xs text-muted-foreground">
-                +2.1% from last month
-              </p>
-            </CardContent>
-          </Card>
+        <div className="flex items-center gap-3">
+          <Badge
+            variant={isAdmin ? "default" : "secondary"}
+            className="gap-1"
+          >
+            <Shield className="h-3 w-3" />
+            {isAdmin ? "Administrator" : "Internal User"}
+          </Badge>
+          <Button variant="outline" size="sm" className="gap-2" onClick={logout}>
+            <LogOut className="h-4 w-4" />
+            Logout
+          </Button>
         </div>
+      </div>
 
-        {/* Management Sections */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <Card className="transition-all hover:shadow-lg">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                  <Users className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <CardTitle>User Management</CardTitle>
-                  <CardDescription>Manage user accounts</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="mb-4 text-sm text-muted-foreground">
-                View, edit, and manage all user accounts and permissions.
-              </p>
-              <Button className="w-full">Manage Users</Button>
-            </CardContent>
-          </Card>
-
-          <Card className="transition-all hover:shadow-lg">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-chart-2/10">
-                  <Package className="h-5 w-5 text-chart-2" />
-                </div>
-                <div>
-                  <CardTitle>Subscriptions</CardTitle>
-                  <CardDescription>Manage subscription plans</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="mb-4 text-sm text-muted-foreground">
-                Create and manage subscription plans and pricing tiers.
-              </p>
-              <Button className="w-full" variant="secondary">
-                View Subscriptions
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="transition-all hover:shadow-lg">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-chart-3/10">
-                  <FileText className="h-5 w-5 text-chart-3" />
-                </div>
-                <div>
-                  <CardTitle>Invoices</CardTitle>
-                  <CardDescription>View and manage invoices</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="mb-4 text-sm text-muted-foreground">
-                Track invoices, payments, and billing history.
-              </p>
-              <Button className="w-full" variant="secondary">
-                View Invoices
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="transition-all hover:shadow-lg">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-chart-4/10">
-                  <CreditCard className="h-5 w-5 text-chart-4" />
-                </div>
-                <div>
-                  <CardTitle>Payments</CardTitle>
-                  <CardDescription>Payment processing</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="mb-4 text-sm text-muted-foreground">
-                Monitor payment transactions and reconciliation.
-              </p>
-              <Button className="w-full" variant="secondary">
-                View Payments
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="transition-all hover:shadow-lg">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-chart-5/10">
-                  <Package className="h-5 w-5 text-chart-5" />
-                </div>
-                <div>
-                  <CardTitle>Products</CardTitle>
-                  <CardDescription>Manage product catalog</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="mb-4 text-sm text-muted-foreground">
-                Create and manage products with variants and pricing.
-              </p>
-              <Button
-                className="w-full"
-                variant="secondary"
-                onClick={() => router.push("/internal/products")}
+      {/* ── Stat cards ──────────────────────────────────────── */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {statCards.map((card) => (
+          <Card key={card.label} className="relative overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {card.label}
+              </CardTitle>
+              <div
+                className={`flex h-8 w-8 items-center justify-center rounded-md ${card.bg}`}
               >
-                Manage Products
-              </Button>
+                <card.icon className={`h-4 w-4 ${card.color}`} />
+              </div>
+            </CardHeader>
+            <CardContent>
+              {statsLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              ) : (
+                <div className="text-2xl font-bold">{card.value}</div>
+              )}
             </CardContent>
           </Card>
+        ))}
+      </div>
 
+      {/* ── Management cards ────────────────────────────────── */}
+      <div>
+        <h2 className="mb-4 text-lg font-semibold tracking-tight">
+          Quick Access
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {MANAGEMENT_CARDS.map((card) => (
+            <Card
+              key={card.title}
+              className="group flex cursor-pointer flex-col transition-all hover:shadow-md"
+              onClick={() => router.push(card.href)}
+            >
+              <CardHeader className="flex-1 pb-3">
+                <div className="mb-3 flex items-center gap-3">
+                  <div
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${card.bg}`}
+                  >
+                    <card.icon className={`h-5 w-5 ${card.color}`} />
+                  </div>
+                  <div className="min-w-0">
+                    <CardTitle className="text-base">{card.title}</CardTitle>
+                    <CardDescription className="text-xs">
+                      {card.description}
+                    </CardDescription>
+                  </div>
+                </div>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {card.detail}
+                </p>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-2 transition-colors group-hover:bg-primary group-hover:text-primary-foreground"
+                >
+                  Open
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+
+          {/* Admin-only: Configuration */}
           {isAdmin && (
-            <Card className="transition-all hover:shadow-lg border-primary/50">
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+            <Card
+              className="group flex cursor-pointer flex-col border-primary/30 transition-all hover:shadow-md"
+              onClick={() => router.push("/internal/configuration")}
+            >
+              <CardHeader className="flex-1 pb-3">
+                <div className="mb-3 flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                     <Settings className="h-5 w-5 text-primary" />
                   </div>
-                  <div>
-                    <CardTitle>System Settings</CardTitle>
-                    <CardDescription>Admin only</CardDescription>
+                  <div className="min-w-0">
+                    <CardTitle className="text-base">Configuration</CardTitle>
+                    <CardDescription className="text-xs">
+                      Admin only
+                    </CardDescription>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <p className="mb-4 text-sm text-muted-foreground">
-                  Configure system settings and manage integrations.
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  Configure system settings, manage product tags, and integrations.
                 </p>
-                <Button className="w-full">Configure System</Button>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-2 transition-colors group-hover:bg-primary group-hover:text-primary-foreground"
+                >
+                  Configure
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Button>
               </CardContent>
             </Card>
           )}
         </div>
-
-        {/* Recent Activity */}
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>
-              Latest updates and system events
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {[
-                {
-                  action: "New user registration",
-                  user: "john@example.com",
-                  time: "2 minutes ago",
-                },
-                {
-                  action: "Subscription activated",
-                  user: "sarah@company.com",
-                  time: "15 minutes ago",
-                },
-                {
-                  action: "Payment received",
-                  user: "mike@startup.io",
-                  time: "1 hour ago",
-                },
-                {
-                  action: "Invoice generated",
-                  user: "lisa@business.com",
-                  time: "2 hours ago",
-                },
-              ].map((activity, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between border-b pb-3 last:border-0"
-                >
-                  <div>
-                    <p className="font-medium">{activity.action}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {activity.user}
-                    </p>
-                  </div>
-                  <span className="text-sm text-muted-foreground">
-                    {activity.time}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

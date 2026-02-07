@@ -250,7 +250,7 @@ export async function POST(request: NextRequest) {
     const computedTax = baseTax * taxRatio;
     const computedTotal = afterDiscount + computedTax;
 
-    // Create the subscription with status CONFIRMED (order placed)
+    // Create the subscription with status ACTIVE (order placed & active)
     const subscription = await prisma.subscription.create({
       data: {
         subscriptionNo,
@@ -259,6 +259,7 @@ export async function POST(request: NextRequest) {
         status: "CONFIRMED",
         discountCode: discountCode || null,
         discountAmount: appliedDiscountAmount,
+        status: "ACTIVE",
         subtotal: computedSubtotal,
         taxAmount: computedTax,
         totalAmount: computedTotal,

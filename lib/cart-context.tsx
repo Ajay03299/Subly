@@ -54,7 +54,7 @@ export interface Product {
 export interface CartItem {
   product: Product;
   quantity: number;
-  plan: RecurringPlanInfo | "Monthly" | "Yearly"; // support both new and old formats
+  plan: RecurringPlanInfo | "Monthly" | "Yearly" | null; // null for one-time purchases
   selectedVariant: ProductVariant | null;
 }
 

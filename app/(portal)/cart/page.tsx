@@ -94,9 +94,11 @@ export default function CartPage() {
         const extra = item.selectedVariant?.extraPrice ?? 0;
         const unitPrice = base + extra;
         const planLabel =
-          typeof item.plan === "string"
-            ? item.plan
-            : item.plan?.billingPeriod ?? "MONTHLY";
+          item.plan === null
+            ? "ONE_TIME"
+            : typeof item.plan === "string"
+              ? item.plan
+              : item.plan?.billingPeriod ?? "ONE_TIME";
 
         return {
           productId: item.product.id,
@@ -202,11 +204,13 @@ export default function CartPage() {
               <TableBody>
                 {items.map((item) => {
                   const planLabel =
-                    typeof item.plan === "string"
-                      ? item.plan
-                      : item.plan?.name
-                        ? `${item.plan.name} (${item.plan.billingPeriod?.toLowerCase()})`
-                        : "—";
+                    item.plan === null
+                      ? "One-time"
+                      : typeof item.plan === "string"
+                        ? item.plan
+                        : item.plan?.name
+                          ? `${item.plan.name} (${item.plan.billingPeriod?.toLowerCase()})`
+                          : "One-time";
                   const planPrice =
                     typeof item.plan === "string"
                       ? item.plan === "Monthly"

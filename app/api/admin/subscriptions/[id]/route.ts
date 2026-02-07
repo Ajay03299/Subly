@@ -126,9 +126,8 @@ export async function PATCH(
     // Handle status transitions
     if (body.status) {
       const validTransitions: Record<string, string[]> = {
-        DRAFT: ["QUOTATION", "CONFIRMED"],
-        QUOTATION: ["CONFIRMED", "DRAFT"],
-        CONFIRMED: ["ACTIVE", "CLOSED"],
+        DRAFT: ["QUOTATION", "ACTIVE"],
+        QUOTATION: ["ACTIVE", "DRAFT"],
         ACTIVE: ["CLOSED"],
         CLOSED: [],
       };
@@ -194,7 +193,7 @@ export async function PATCH(
       delete body.lines;
     }
 
-    // Handle "renew" action — create a CONFIRMED copy (no edits needed)
+    // Handle "renew" action — create an ACTIVE copy (no edits needed)
     if (body.action === "renew") {
       const newSubNo = await generateSubscriptionNo();
 
@@ -204,7 +203,7 @@ export async function PATCH(
           userId: existing.userId,
           recurringPlanId: existing.recurringPlanId,
           paymentTerms: existing.paymentTerms,
-          status: "CONFIRMED",
+          status: "ACTIVE",
           subtotal: existing.subtotal,
           taxAmount: existing.taxAmount,
           totalAmount: existing.totalAmount,

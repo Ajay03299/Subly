@@ -279,7 +279,7 @@ export default function InvoiceDetailPage() {
           <h1 className="text-2xl font-bold tracking-tight">
             Invoice {invoice.invoiceNo}
           </h1>
-          <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
             <span>Source: {invoice.subscription.subscriptionNo}</span>
             <span>·</span>
             <Badge
@@ -293,7 +293,7 @@ export default function InvoiceDetailPage() {
             >
               {isPaid ? "Paid" : invoice.status}
             </Badge>
-          </p>
+          </div>
         </div>
         <div className="flex gap-2">
           {!isPaid && (

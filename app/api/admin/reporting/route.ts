@@ -105,10 +105,10 @@ export async function GET(request: NextRequest) {
       }),
       prisma.invoice.count(),
 
-      // Revenue: total from confirmed/active subscriptions
+      // Revenue: total from active subscriptions
       prisma.subscription.aggregate({
         _sum: { totalAmount: true },
-        where: { status: { in: ["CONFIRMED", "ACTIVE"] } },
+        where: { status: { in: ["ACTIVE"] } },
       }),
 
       // Payments aggregate
@@ -279,8 +279,7 @@ export async function GET(request: NextRequest) {
       {
         overview: {
           totalSubscriptions,
-          activeSubscriptions:
-            (statusCounts.CONFIRMED || 0) + (statusCounts.ACTIVE || 0),
+          activeSubscriptions: statusCounts.ACTIVE || 0,
           totalRevenue,
           totalPayments: totalPaymentAmount,
           paymentCount: totalPayments,

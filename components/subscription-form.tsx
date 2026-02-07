@@ -382,7 +382,7 @@ export function SubscriptionForm({
   };
 
   /* ── Read-only check ────────────────────────────────── */
-  const isReadOnly = status === "CONFIRMED" || status === "ACTIVE" || status === "CLOSED";
+  const isReadOnly = status === "ACTIVE" || status === "CLOSED";
 
   if (fetchingData) {
     return (
@@ -416,22 +416,22 @@ export function SubscriptionForm({
         {/* ── Status flow indicator ──────────────────── */}
         {!isNew && (
           <div className="flex items-center gap-1">
-            {["DRAFT", "QUOTATION", "CONFIRMED", "ACTIVE", "CLOSED"].map(
+            {["DRAFT", "QUOTATION", "ACTIVE", "CLOSED"].map(
               (s, i) => (
                 <div key={s} className="flex items-center">
                   <div
                     className={`flex h-8 items-center rounded-full px-3 text-xs font-medium ${
                       s === status
                         ? "bg-primary text-primary-foreground"
-                        : ["DRAFT", "QUOTATION", "CONFIRMED", "ACTIVE", "CLOSED"].indexOf(s) <
-                          ["DRAFT", "QUOTATION", "CONFIRMED", "ACTIVE", "CLOSED"].indexOf(status)
+                        : ["DRAFT", "QUOTATION", "ACTIVE", "CLOSED"].indexOf(s) <
+                          ["DRAFT", "QUOTATION", "ACTIVE", "CLOSED"].indexOf(status)
                         ? "bg-primary/20 text-primary"
                         : "bg-muted text-muted-foreground"
                     }`}
                   >
                     {statusLabel(s)}
                   </div>
-                  {i < 4 && (
+                  {i < 3 && (
                     <div className="mx-1 h-px w-4 bg-border" />
                   )}
                 </div>
@@ -459,7 +459,7 @@ export function SubscriptionForm({
           </Button>
         )}
 
-        {/* Draft actions: Send & Confirm */}
+        {/* Draft actions: Send Quotation & Activate */}
         {!isNew && status === "DRAFT" && (
           <>
             <Button
@@ -472,68 +472,26 @@ export function SubscriptionForm({
               Send Quotation
             </Button>
             <Button
-              variant="outline"
               className="gap-2"
-              onClick={() => onStatusChange("CONFIRMED")}
+              onClick={() => onStatusChange("ACTIVE")}
               disabled={loading}
             >
               <CheckCircle2 className="h-4 w-4" />
-              Confirm
+              Activate
             </Button>
           </>
         )}
 
-        {/* Quotation actions: Confirm */}
+        {/* Quotation actions: Activate */}
         {status === "QUOTATION" && (
           <>
             <Button
               className="gap-2"
-              onClick={() => onStatusChange("CONFIRMED")}
+              onClick={() => onStatusChange("ACTIVE")}
               disabled={loading}
             >
               <CheckCircle2 className="h-4 w-4" />
-              Confirm
-            </Button>
-          </>
-        )}
-
-        {/* Confirmed actions: Create Invoice, Renew (confirm directly), Upsell (editable copy), Close */}
-        {status === "CONFIRMED" && (
-          <>
-            <Button
-              className="gap-2"
-              onClick={() => onAction("create_invoice")}
-              disabled={loading}
-            >
-              <FileText className="h-4 w-4" />
-              Create Invoice
-            </Button>
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => onAction("renew")}
-              disabled={loading}
-            >
-              <RefreshCw className="h-4 w-4" />
-              Renew
-            </Button>
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => onAction("upsell")}
-              disabled={loading}
-            >
-              <ArrowUpCircle className="h-4 w-4" />
-              Upsell
-            </Button>
-            <Button
-              variant="outline"
-              className="gap-2 border-destructive text-destructive hover:bg-destructive/10"
-              onClick={() => onStatusChange("CLOSED")}
-              disabled={loading}
-            >
-              <Lock className="h-4 w-4" />
-              Close
+              Activate
             </Button>
           </>
         )}

@@ -8,6 +8,15 @@ export async function GET(request: NextRequest) {
       include: {
         images: true,
         tax: true,
+        tag: true,
+        recurringPlans: {
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            billingPeriod: true,
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',

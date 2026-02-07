@@ -36,6 +36,7 @@ interface Product {
   name: string;
   description: string | null;
   type: "SERVICE" | "CONSUMABLE" | "STORABLE";
+  salesPrice: number;
   tag: ProductTag | null;
   averageRating: number;
   images: ProductImage[];
@@ -87,8 +88,8 @@ export default function ShopPage() {
       p.tag?.name.toLowerCase().includes(search.toLowerCase());
     return matchesSearch;
   }).sort((a, b) => {
-    const priceA = a.recurringPlans?.[0]?.price ?? 0;
-    const priceB = b.recurringPlans?.[0]?.price ?? 0;
+    const priceA = a.recurringPlans?.[0]?.price ?? Number(a.salesPrice) ?? 0;
+    const priceB = b.recurringPlans?.[0]?.price ?? Number(b.salesPrice) ?? 0;
     return sortAsc ? priceA - priceB : priceB - priceA;
   });
 
@@ -218,7 +219,7 @@ export default function ShopPage() {
                     <>
                       <div className="mt-3 flex items-baseline gap-1">
                         <span className="text-2xl font-bold">
-                          ₹{product.recurringPlans[0].price.toLocaleString()}
+                          ₹{Number(product.recurringPlans[0].price).toLocaleString()}
                         </span>
                         <span className="text-sm text-muted-foreground">
                           /{product.recurringPlans[0].billingPeriod.toLowerCase()}
@@ -230,7 +231,16 @@ export default function ShopPage() {
                         </p>
                       )}
                     </>
-                  ) : null}
+                  ) : (
+                    <div className="mt-3 flex items-baseline gap-1">
+                      <span className="text-2xl font-bold">
+                        ₹{Number(product.salesPrice).toLocaleString()}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        one-time
+                      </span>
+                    </div>
+                  )}
                 </CardContent>
 
                 <CardFooter className="px-5 pb-5 pt-0">

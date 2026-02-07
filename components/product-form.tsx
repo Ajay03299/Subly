@@ -592,6 +592,8 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
               </div>
             </div>
 
+=======
+>>>>>>> 94ddf81 (Seed for Tax and Tag and also added RecurringPlanInfos)
             <Button
               type="button"
               onClick={addRecurringPlanInfo}

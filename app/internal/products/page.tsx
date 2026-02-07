@@ -66,18 +66,18 @@ interface CreateFormPayload {
     costPrice: number;
   };
   variants: Array<{ attribute: string; value: string; extraPrice: number }>;
-  recurring: {
+  recurringPlans: Array<{
     name: string;
     price: number;
     billingPeriod: string;
     minimumQuantity: number;
     startDate: string;
-    endDate: string | null;
+    endDate?: string;
     autoClose: boolean;
     closeable: boolean;
     renewable: boolean;
     pausable: boolean;
-  } | null;
+  }>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -150,7 +150,7 @@ export default function ProductsPage() {
       const token = getToken();
 
       // Create product first (without recurring plans)
-      const productResponse = await fetch("/api/admin/products", {
+      const prodRes = await fetch("/api/admin/products", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -165,7 +165,7 @@ export default function ProductsPage() {
         throw new Error(e.error || "Failed to create product");
       }
 
-      const productData = await productResponse.json();
+      const productData = await prodRes.json();
       const productId = productData.product.id;
 
       // Create recurring plans
@@ -175,7 +175,7 @@ export default function ProductsPage() {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${accessToken}`,
+              Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({
               productId,
@@ -537,20 +537,18 @@ export default function ProductsPage() {
                         <TableCell>
                           {product.variants.length > 0 ? (
                             <div className="flex flex-wrap gap-1">
-                              {product.variants.slice(0, 3).map((v) => (
+                              {product.variants.slice(0, 2).map((v) => (
                                 <Badge
                                   key={v.id}
                                   variant="outline"
                                   className="text-[11px]"
                                 >
                                   {v.attribute}: {v.value}
-                                  {Number(v.extraPrice) > 0 &&
-                                    ` +₹${Number(v.extraPrice)}`}
                                 </Badge>
                               ))}
-                              {product.variants.length > 3 && (
-                                <Badge variant="outline" className="text-[11px]">
-                                  +{product.variants.length - 3} more
+                              {product.variants.length > 2 && (
+                                <Badge variant="secondary" className="text-[11px]">
+                                  +{product.variants.length - 2} variants
                                 </Badge>
                               )}
                             </div>
@@ -560,15 +558,17 @@ export default function ProductsPage() {
                         </TableCell>
                         <TableCell>
                           {product.recurringPlans && product.recurringPlans.length > 0 ? (
-                            <div className="space-y-1">
-                              {product.recurringPlans.map((plan) => (
-                                <div key={plan.id} className="text-sm">
-                                  <p className="font-medium">{plan.name}</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {plan.billingPeriod}
-                                  </p>
-                                </div>
+                            <div className="flex flex-wrap gap-1">
+                              {product.recurringPlans.slice(0, 1).map((plan) => (
+                                <Badge key={plan.id} variant="outline" className="text-[11px]">
+                                  {plan.name}
+                                </Badge>
                               ))}
+                              {product.recurringPlans.length > 1 && (
+                                <Badge variant="secondary" className="text-[11px]">
+                                  +{product.recurringPlans.length - 1} plans
+                                </Badge>
+                              )}
                             </div>
                           ) : (
                             <span className="text-muted-foreground">—</span>

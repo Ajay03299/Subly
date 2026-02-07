@@ -41,6 +41,9 @@ export async function POST(request: NextRequest) {
       type,
       salesPrice,
       costPrice,
+      description,
+      tagId,
+      images,
     } = await request.json();
 
     // Validate required fields
@@ -69,10 +72,20 @@ export async function POST(request: NextRequest) {
         type,
         salesPrice: sales,
         costPrice: cost,
+        description: description || null,
+        tag: tagId ? { connect: { id: tagId } } : undefined,
+        images: {
+          create: images && Array.isArray(images) ? images.map((img: any) => ({
+            url: img.url,
+            alt: img.alt || null,
+          })) : [],
+        },
       },
       include: {
         variants: true,
         recurringPlans: true,
+        tag: true,
+        images: true,
       },
     });
 
@@ -118,6 +131,8 @@ export async function GET(request: NextRequest) {
       include: {
         variants: true,
         recurringPlans: true,
+        tag: true,
+        images: true,
       },
       orderBy: {
         createdAt: 'desc',

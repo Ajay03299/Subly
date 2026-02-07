@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -23,15 +23,74 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useCart, type ProductVariant } from "@/lib/cart-context";
-import { getProduct, PRODUCT_TYPES } from "@/lib/products-data";
+import { useCart } from "@/lib/cart-context";
 import { cn } from "@/lib/utils";
 
-/* ------------------------------------------------------------------ */
-/*  Helper: group variants by attribute                               */
-/* ------------------------------------------------------------------ */
-function groupVariants(variants: ProductVariant[]) {
-  const map = new Map<string, ProductVariant[]>();
+/* ─────────────────────────────────────────────────────────────────── */
+/* Type definitions matching API response                             */
+/* ─────────────────────────────────────────────────────────────────── */
+interface ProductImage {
+  id: string;
+  url: string;
+  alt: string | null;
+}
+
+interface ProductTag {
+  id: string;
+  name: string;
+}
+
+interface Variant {
+  id: string;
+  attribute: string;
+  value: string;
+  extraPrice: number;
+}
+
+interface RecurringPlan {
+  id: string;
+  name: string;
+  price: number;
+  billingPeriod: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
+  minimumQuantity: number;
+  closeable: boolean;
+  renewable: boolean;
+  pausable: boolean;
+  autoClose: boolean;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  description: string | null;
+  type: "SERVICE" | "CONSUMABLE" | "STORABLE";
+  tag: ProductTag | null;
+  averageRating: number;
+  images: ProductImage[];
+  variants: Variant[];
+  recurringPlans: RecurringPlan[];
+  taxRate: number;
+}
+
+const PRODUCT_TYPES: Record<string, string> = {
+  SERVICE: "Service",
+  CONSUMABLE: "Consumable",
+  STORABLE: "Storable",
+};
+
+const BILLING_PERIOD_LABELS: Record<string, string> = {
+  DAILY: "Daily",
+  WEEKLY: "Weekly",
+  MONTHLY: "Monthly",
+  YEARLY: "Yearly",
+};
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* Helper: group variants by attribute                                */
+/* ─────────────────────────────────────────────────────────────────── */
+function groupVariants(variants: Variant[] | undefined) {
+  const map = new Map<string, Variant[]>();
+  if (!variants || !Array.isArray(variants)) return map;
   for (const v of variants) {
     const arr = map.get(v.attribute) ?? [];
     arr.push(v);
@@ -40,42 +99,86 @@ function groupVariants(variants: ProductVariant[]) {
   return map;
 }
 
-/* ================================================================== */
-/*  Page                                                              */
-/* ================================================================== */
+/* ═════════════════════════════════════════════════════════════════════ */
+/* Page                                                                  */
+/* ═════════════════════════════════════════════════════════════════════ */
 
 export default function ProductPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { addItem } = useCart();
-  const product = getProduct(id);
+
+  /* ── api state ──────────────────────────────────────── */
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   /* ── local state ────────────────────────────────────── */
   const [selectedImage, setSelectedImage] = useState(0);
-  const [plan, setPlan] = useState<"Monthly" | "Yearly">("Monthly");
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
 
   // Per-attribute variant selection
   const [selectedVariants, setSelectedVariants] = useState<
-    Record<string, ProductVariant>
+    Record<string, Variant>
   >({});
 
   // Variant dropdown open state
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
+  /* ── fetch product from api ─────────────────────────── */
+  useEffect(() => {
+    if (!id) return;
+
+    const fetchProduct = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/products/${id}`);
+        if (!response.ok) {
+          throw new Error("Product not found");
+        }
+        const data = await response.json();
+        const productData: Product = data.product || data;
+        setProduct(productData);
+        // Set first recurring plan as default
+        if (productData.recurringPlans?.length > 0) {
+          setSelectedPlan(productData.recurringPlans[0].id);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load product");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProduct();
+  }, [id]);
+
   // Computed
   const grouped = useMemo(
-    () => (product ? groupVariants(product.variants) : new Map()),
+    () => (product?.variants ? groupVariants(product.variants) : new Map()),
     [product]
   );
 
-  if (!product) {
+  const selectedPlanData = product?.recurringPlans.find(p => p.id === selectedPlan);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold">Loading...</h2>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !product) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold">Product not found</h2>
           <p className="mt-2 text-muted-foreground">
-            The product you&apos;re looking for doesn&apos;t exist.
+            {error || "The product you're looking for doesn't exist."}
           </p>
           <Button className="mt-4" asChild>
             <Link href="/">Back to Shop</Link>
@@ -86,8 +189,7 @@ export default function ProductPage() {
   }
 
   /* ── pricing ───────────────────────────────────────── */
-  const basePrice =
-    plan === "Monthly" ? product.monthlyPrice : product.yearlyPrice;
+  const basePrice = selectedPlanData?.price ?? 0;
 
   const totalExtraPrice = Object.values(selectedVariants).reduce(
     (sum, v) => sum + v.extraPrice,
@@ -100,7 +202,7 @@ export default function ProductPage() {
   const grandTotal = untaxedTotal + taxAmount;
 
   /* ── variant helpers ───────────────────────────────── */
-  function selectVariant(attribute: string, variant: ProductVariant) {
+  function selectVariant(attribute: string, variant: Variant) {
     setSelectedVariants((prev) => {
       // Toggle off if already selected
       if (prev[attribute]?.value === variant.value) {
@@ -114,12 +216,13 @@ export default function ProductPage() {
   }
 
   // For cart: pick the first selected variant (or combine label)
-  const primaryVariant: ProductVariant | null = (() => {
+  const primaryVariant: Variant | null = (() => {
     const vals = Object.values(selectedVariants);
     if (vals.length === 0) return null;
     if (vals.length === 1) return vals[0];
     // Combine into a single "virtual" variant
     return {
+      id: "combined",
       attribute: vals.map((v) => v.attribute).join(" + "),
       value: vals.map((v) => v.value).join(", "),
       extraPrice: totalExtraPrice,
@@ -127,10 +230,11 @@ export default function ProductPage() {
   })();
 
   function handleAddToCart() {
+    if (!selectedPlanData) return;
     addItem({
       product,
       quantity,
-      plan,
+      plan: selectedPlanData,
       selectedVariant: primaryVariant,
     });
     router.push("/cart");
@@ -153,16 +257,26 @@ export default function ProductPage() {
       </nav>
 
       <div className="grid gap-10 lg:grid-cols-2">
-        {/* ── Left: Images ──────────────────────────────── */}
+        {/* ── Images ────────────────────────────────── */}
         <div className="space-y-4">
-          {/* Main image — click thumbnails to show in big */}
+          {/* Main image */}
           <div className="relative flex h-80 items-center justify-center rounded-xl border border-border bg-muted/30 sm:h-[440px]">
-            <div className="flex h-44 w-44 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-accent/30 text-7xl font-bold text-primary">
-              {product.name.charAt(0)}
-            </div>
-            <span className="absolute bottom-3 right-3 rounded-md bg-background/80 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
-              {product.images[selectedImage]}
-            </span>
+            {product.images.length > 0 && selectedImage < product.images.length ? (
+              <img
+                src={product.images[selectedImage].url}
+                alt={product.images[selectedImage].alt || product.name}
+                className="max-h-full max-w-full object-contain"
+              />
+            ) : (
+              <div className="flex h-44 w-44 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-accent/30 text-7xl font-bold text-primary">
+                {product.name.charAt(0)}
+              </div>
+            )}
+            {product.images.length > 0 && (
+              <span className="absolute bottom-3 right-3 rounded-md bg-background/80 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
+                {selectedImage + 1} / {product.images.length}
+              </span>
+            )}
           </div>
 
           {/* Thumbnails */}
@@ -170,16 +284,20 @@ export default function ProductPage() {
             <div className="flex gap-3">
               {product.images.map((img, i) => (
                 <button
-                  key={i}
+                  key={img.id}
                   onClick={() => setSelectedImage(i)}
                   className={cn(
-                    "flex h-20 w-20 items-center justify-center rounded-lg border-2 bg-muted/30 text-xs font-medium transition-all",
+                    "flex h-20 w-20 items-center justify-center rounded-lg border-2 bg-muted/30 overflow-hidden transition-all",
                     selectedImage === i
                       ? "border-primary shadow-sm"
                       : "border-transparent hover:border-border"
                   )}
                 >
-                  {img}
+                  <img
+                    src={img.url}
+                    alt={img.alt || `Thumbnail ${i + 1}`}
+                    className="h-full w-full object-cover"
+                  />
                 </button>
               ))}
             </div>
@@ -188,14 +306,14 @@ export default function ProductPage() {
 
         {/* ── Right: Details ────────────────────────────── */}
         <div className="space-y-6">
-          {/* Header badges */}
+          {/* ── Header badges ─────────────────────── */}
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary">{product.category}</Badge>
+              <Badge variant="secondary">{product.type}</Badge>
               <Badge variant="outline">
                 {PRODUCT_TYPES[product.type] ?? product.type}
               </Badge>
-              {product.tag && <Badge>{product.tag}</Badge>}
+              {product.tag && <Badge>{product.tag.name}</Badge>}
             </div>
 
             <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
@@ -204,82 +322,82 @@ export default function ProductPage() {
 
             <div className="mt-2 flex items-center gap-1.5">
               <Star className="h-4 w-4 fill-chart-4 text-chart-4" />
-              <span className="text-sm font-medium">{product.rating}</span>
+              <span className="text-sm font-medium">
+                {Number(product.averageRating).toFixed(1)}
+              </span>
               <span className="text-xs text-muted-foreground">/5</span>
             </div>
 
-            <p className="mt-4 leading-relaxed text-muted-foreground">
-              {product.description}
-            </p>
+            {product.description && (
+              <p className="mt-4 leading-relaxed text-muted-foreground">
+                {product.description}
+              </p>
+            )}
           </div>
 
-          {/* ── Billing Plan toggle ──────────────────────── */}
-          <div>
-            <label className="mb-2 block text-sm font-medium">
-              Billing Period
-            </label>
-            <div className="inline-flex rounded-lg border border-border p-1">
-              {(["Monthly", "Yearly"] as const).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPlan(p)}
-                  className={cn(
-                    "rounded-md px-5 py-2.5 text-sm font-medium transition-all",
-                    plan === p
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
+          {/* ── Recurring Plans dropdown ────────────── */}
+          {product.recurringPlans.length > 0 && (
+            <div>
+              <label className="mb-2 block text-sm font-medium">
+                Billing Plan
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedPlan || ""}
+                  onChange={(e) => setSelectedPlan(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm transition-colors"
                 >
-                  {p}
-                  <span className="ml-1 text-xs opacity-70">
-                    ₹{p === "Monthly" ? product.monthlyPrice : product.yearlyPrice}
-                  </span>
-                </button>
-              ))}
+                  {product.recurringPlans.map((plan) => (
+                    <option key={plan.id} value={plan.id}>
+                      {plan.name} - ₹{plan.price}/{BILLING_PERIOD_LABELS[plan.billingPeriod]}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* ── Recurring Plan info ──────────────────────── */}
-          {product.recurringPlan && (
+          {/* ── Recurring Plan info ──────────────────── */}
+          {selectedPlanData && (
             <Card className="border-primary/20 bg-primary/[0.02] dark:bg-primary/[0.04]">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm font-semibold">
                   <CalendarDays className="h-4 w-4 text-primary" />
-                  Subscription Plan: {product.recurringPlan.name}
+                  Plan: {selectedPlanData.name}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
                   <span>
                     <span className="text-muted-foreground">Billing:</span>{" "}
-                    <span className="font-medium capitalize">
-                      {product.recurringPlan.billingPeriod.toLowerCase()}
+                    <span className="font-medium">
+                      {BILLING_PERIOD_LABELS[selectedPlanData.billingPeriod]}
                     </span>
                   </span>
                   <span>
                     <span className="text-muted-foreground">Min Qty:</span>{" "}
                     <span className="font-medium">
-                      {product.recurringPlan.minimumQuantity}
+                      {selectedPlanData.minimumQuantity}
                     </span>
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {product.recurringPlan.closeable && (
+                  {selectedPlanData.closeable && (
                     <Badge variant="outline" className="gap-1 text-xs">
                       <XIcon className="h-3 w-3" /> Closeable
                     </Badge>
                   )}
-                  {product.recurringPlan.renewable && (
+                  {selectedPlanData.renewable && (
                     <Badge variant="outline" className="gap-1 text-xs">
                       <RefreshCw className="h-3 w-3" /> Renewable
                     </Badge>
                   )}
-                  {product.recurringPlan.pausable && (
+                  {selectedPlanData.pausable && (
                     <Badge variant="outline" className="gap-1 text-xs">
                       <Pause className="h-3 w-3" /> Pausable
                     </Badge>
                   )}
-                  {product.recurringPlan.autoClose && (
+                  {selectedPlanData.autoClose && (
                     <Badge variant="outline" className="gap-1 text-xs">
                       <Lock className="h-3 w-3" /> Auto Close
                     </Badge>
@@ -302,7 +420,7 @@ export default function ProductPage() {
                     {attribute}
                   </span>
 
-                  {/* Dropdown-style selector */}
+            {/* Dropdown-style selector */}
                   <div className="relative">
                     <button
                       type="button"
@@ -345,7 +463,7 @@ export default function ProductPage() {
                             selectedVariants[attribute]?.value === v.value;
                           return (
                             <button
-                              key={v.value}
+                              key={v.id}
                               type="button"
                               onClick={() => selectVariant(attribute, v)}
                               className={cn(
@@ -399,10 +517,10 @@ export default function ProductPage() {
                 <Plus className="h-4 w-4" />
               </button>
             </div>
-            {product.recurringPlan &&
-              product.recurringPlan.minimumQuantity > 1 && (
+            {product.recurringPlans.length > 0 &&
+              product.recurringPlans[0].minimumQuantity > 1 && (
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Minimum quantity: {product.recurringPlan.minimumQuantity}
+                  Minimum quantity: {selectedPlanData?.minimumQuantity}
                 </p>
               )}
           </div>
@@ -418,7 +536,7 @@ export default function ProductPage() {
                 <span className="text-2xl font-bold">
                   ₹{unitPrice.toLocaleString()}
                   <span className="text-sm font-normal text-muted-foreground">
-                    /{plan === "Monthly" ? "mo" : "yr"}
+                    /{selectedPlanData ? BILLING_PERIOD_LABELS[selectedPlanData.billingPeriod].toLowerCase() : "period"}
                   </span>
                 </span>
               </div>

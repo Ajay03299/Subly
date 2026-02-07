@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +20,16 @@ interface Variant {
   attribute: string;
   value: string;
   extraPrice: number;
+}
+
+interface ProductImage {
+  url: string;
+  alt?: string;
+}
+
+interface ProductTag {
+  id: string;
+  name: string;
 }
 
 interface RecurringPlan {
@@ -46,6 +56,12 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
   const [type, setType] = useState("SERVICE");
   const [salesPrice, setSalesPrice] = useState("");
   const [costPrice, setCostPrice] = useState("");
+  const [description, setDescription] = useState("");
+  const [tagId, setTagId] = useState("");
+  const [tags, setTags] = useState<ProductTag[]>([]);
+  const [images, setImages] = useState<ProductImage[]>([]);
+  const [imageUrl, setImageUrl] = useState("");
+  const [imageAlt, setImageAlt] = useState("");
 
   // Recurring Plans management
   const [recurringPlans, setRecurringPlans] = useState<RecurringPlan[]>([]);
@@ -66,6 +82,25 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
   const [variantExtraPrice, setVariantExtraPrice] = useState("");
 
   const [error, setError] = useState<string | null>(null);
+
+  const getToken = () => localStorage.getItem("accessToken") ?? "";
+
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        const res = await fetch("/api/admin/product-tags", {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setTags(data.tags || []);
+      } catch {
+        // silent
+      }
+    };
+
+    fetchTags();
+  }, []);
 
   const addVariant = () => {
     if (!variantAttribute || !variantValue) {
@@ -127,6 +162,27 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
     setRecurringPlans(recurringPlans.filter((_, i) => i !== index));
   };
 
+  const addImage = () => {
+    if (!imageUrl) {
+      setError("Please provide an image URL");
+      return;
+    }
+
+    const newImage: ProductImage = {
+      url: imageUrl,
+      alt: imageAlt || undefined,
+    };
+
+    setImages([...images, newImage]);
+    setImageUrl("");
+    setImageAlt("");
+    setError(null);
+  };
+
+  const removeImage = (index: number) => {
+    setImages(images.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -144,6 +200,9 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
           type,
           salesPrice: parseFloat(salesPrice),
           costPrice: parseFloat(costPrice),
+          description: description || null,
+          tagId: tagId || null,
+          images,
         },
         variants,
         recurringPlans,
@@ -215,6 +274,108 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
               required
             />
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="tagId">Product Tag (Optional)</Label>
+            <Select value={tagId} onValueChange={setTagId}>
+              <SelectTrigger id="tagId">
+                <SelectValue placeholder="Select a tag" />
+              </SelectTrigger>
+              <SelectContent position="popper">
+                {tags.length === 0 ? (
+                  <SelectItem value="no-tags" disabled>
+                    No tags available
+                  </SelectItem>
+                ) : (
+                  tags.map((tag) => (
+                    <SelectItem key={tag.id} value={tag.id}>
+                      {tag.name}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description">Product Description (Optional)</Label>
+            <textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Describe your product..."
+              className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Product Images Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Product Images (Optional)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="imageUrl">Image URL</Label>
+            <Input
+              id="imageUrl"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="e.g., https://example.com/image.jpg"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="imageAlt">Alt Text (Optional)</Label>
+            <Input
+              id="imageAlt"
+              value={imageAlt}
+              onChange={(e) => setImageAlt(e.target.value)}
+              placeholder="e.g., Product main image"
+            />
+          </div>
+
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-full gap-2"
+            onClick={addImage}
+          >
+            <Plus className="h-4 w-4" />
+            Add Image
+          </Button>
+
+          {images.length > 0 && (
+            <div className="space-y-2">
+              <Label>Added Images</Label>
+              <div className="space-y-2">
+                {images.map((image, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between rounded-lg bg-gray-50 p-3"
+                  >
+                    <div className="flex-1 truncate">
+                      <p className="truncate text-sm font-medium">{image.url}</p>
+                      {image.alt && (
+                        <p className="text-xs text-muted-foreground">
+                          Alt: {image.alt}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeImage(index)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

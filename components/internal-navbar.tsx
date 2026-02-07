@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ShoppingBag,
   User,
@@ -22,13 +22,88 @@ const NAV_TABS = [
   { label: "Products", href: "/internal/products" },
   { label: "Reporting", href: "/internal/reporting" },
   { label: "Users/Contacts", href: "/internal/users" },
-  { label: "Configuration", href: "/internal/configuration" },
 ];
 
 export function InternalNavbar() {
   const pathname = usePathname();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
+  const configRef = useRef<HTMLDivElement | null>(null);
+  const [tagName, setTagName] = useState("");
+  const [tagError, setTagError] = useState<string | null>(null);
+  const [tags, setTags] = useState<Array<{ id: string; name: string }>>([]);
+  const [tagLoading, setTagLoading] = useState(false);
   const { user, logout } = useAuth();
+
+  const getToken = () => localStorage.getItem("accessToken") ?? "";
+
+  useEffect(() => {
+    if (!configOpen || user?.role !== "ADMIN") return;
+
+    const fetchTags = async () => {
+      try {
+        const res = await fetch("/api/admin/product-tags", {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setTags(data.tags || []);
+      } catch {
+        // silent
+      }
+    };
+
+    fetchTags();
+  }, [configOpen, user?.role]);
+
+  useEffect(() => {
+    if (!configOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!configRef.current) return;
+      if (!configRef.current.contains(event.target as Node)) {
+        setConfigOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [configOpen]);
+
+  const handleAddTag = async () => {
+    if (!tagName.trim()) {
+      setTagError("Tag name is required");
+      return;
+    }
+
+    try {
+      setTagLoading(true);
+      setTagError(null);
+      const res = await fetch("/api/admin/product-tags", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({ name: tagName.trim() }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to create tag");
+      }
+
+      const data = await res.json();
+      setTags((prev) =>
+        [data.tag, ...prev].sort((a, b) => a.name.localeCompare(b.name))
+      );
+      setTagName("");
+    } catch (err) {
+      setTagError(err instanceof Error ? err.message : "Failed to create tag");
+    } finally {
+      setTagLoading(false);
+    }
+  };
 
   // Get user name from email
   const userName = user?.email?.split("@")[0]?.charAt(0).toUpperCase() + user?.email?.split("@")[0]?.slice(1) || "User";
@@ -102,24 +177,61 @@ export function InternalNavbar() {
         </div>
 
         {/* ── Tab row ────────────────────────────────────── */}
-        <div className="-mb-px flex gap-1 overflow-x-auto">
-          {NAV_TABS.map((tab) => {
-            const isActive = pathname.startsWith(tab.href);
-            return (
-              <Link
-                key={tab.href}
-                href={tab.href}
+        <div className="-mb-px flex gap-1 overflow-visible">
+          <div className="flex gap-1 overflow-x-auto">
+            {NAV_TABS.map((tab) => {
+              const isActive = pathname.startsWith(tab.href);
+              return (
+                <Link
+                  key={tab.href}
+                  href={tab.href}
+                  className={cn(
+                    "whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
+                    isActive
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+                  )}
+                >
+                  {tab.label}
+                </Link>
+              );
+            })}
+          </div>
+
+          {user?.role === "ADMIN" && (
+            <div className="relative" ref={configRef}>
+              <Button
+                variant="ghost"
                 className={cn(
                   "whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
-                  isActive
+                  configOpen
                     ? "border-primary text-primary"
                     : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
                 )}
+                onClick={() => setConfigOpen((prev) => !prev)}
               >
-                {tab.label}
-              </Link>
-            );
-          })}
+                Configuration
+                <ChevronDown
+                  className={cn(
+                    "ml-2 h-3 w-3 transition-transform",
+                    configOpen && "rotate-180"
+                  )}
+                />
+              </Button>
+
+              {configOpen && (
+                <div className="absolute left-0 mt-2 w-72 rounded-lg border border-border bg-popover p-3 shadow-lg">
+                  <Button asChild variant="outline" size="sm" className="mb-3 w-full" onClick={() => setConfigOpen(false)}>
+                    <Link href="/internal/configuration">Manage Product Tags</Link>
+                  </Button>
+
+                  {tagError && (
+                    <div className="mt-2 text-xs text-destructive">{tagError}</div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </nav>

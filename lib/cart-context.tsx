@@ -13,12 +13,14 @@ import {
 /* ------------------------------------------------------------------ */
 
 export interface ProductVariant {
+  id?: string;
   attribute: string;
   value: string;
   extraPrice: number;
 }
 
 export interface RecurringPlanInfo {
+  id: string;
   name: string;
   billingPeriod: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
   price: number;
@@ -32,25 +34,27 @@ export interface RecurringPlanInfo {
 export interface Product {
   id: string;
   name: string;
-  category: string;
+  category?: string;
   type: "SERVICE" | "CONSUMABLE" | "STORABLE";
-  description: string;
-  salesPrice: number;
-  monthlyPrice: number;
-  yearlyPrice: number;
-  costPrice: number;
-  rating: number;
-  tag: string | null;
+  description?: string;
+  salesPrice?: number;
+  monthlyPrice?: number;
+  yearlyPrice?: number;
+  costPrice?: number;
+  rating?: number;
+  averageRating?: number;
+  tag: { id: string; name: string } | string | null;
   variants: ProductVariant[];
-  images: string[];
-  recurringPlan: RecurringPlanInfo | null;
+  images?: string[] | { id: string; url: string; alt: string | null }[];
+  recurringPlan?: RecurringPlanInfo | null;
+  recurringPlans?: RecurringPlanInfo[];
   taxRate: number; // percentage, e.g. 15
 }
 
 export interface CartItem {
   product: Product;
   quantity: number;
-  plan: "Monthly" | "Yearly";
+  plan: RecurringPlanInfo | "Monthly" | "Yearly"; // support both new and old formats
   selectedVariant: ProductVariant | null;
 }
 

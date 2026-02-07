@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Search, SlidersHorizontal, ShoppingCart, Star } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -13,24 +13,84 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 import { useCart } from "@/lib/cart-context";
-import { PRODUCTS, CATEGORIES, PRODUCT_TYPES } from "@/lib/products-data";
+
+const PRODUCT_TYPES: Record<string, string> = {
+  SERVICE: "Service",
+  CONSUMABLE: "Consumable",
+  STORABLE: "Storable",
+};
+
+interface ProductImage {
+  id: string;
+  url: string;
+  alt: string | null;
+}
+
+interface ProductTag {
+  id: string;
+  name: string;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  description: string | null;
+  type: "SERVICE" | "CONSUMABLE" | "STORABLE";
+  tag: ProductTag | null;
+  averageRating: number;
+  images: ProductImage[];
+  recurringPlans: Array<{
+    id: string;
+    name: string;
+    price: number;
+    billingPeriod: string;
+  }>;
+}
 
 export default function ShopPage() {
   const [search, setSearch] = useState("");
-  const [activeCategory, setActiveCategory] = useState("All Products");
   const [sortAsc, setSortAsc] = useState(true);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const { addItem } = useCart();
 
-  const filtered = PRODUCTS.filter((p) => {
-    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory =
-      activeCategory === "All Products" || p.category === activeCategory;
-    return matchesSearch && matchesCategory;
-  }).sort((a, b) =>
-    sortAsc
-      ? a.monthlyPrice - b.monthlyPrice
-      : b.monthlyPrice - a.monthlyPrice
-  );
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await fetch("/api/products");
+        if (response.ok) {
+          const data = await response.json();
+          // API returns {products: [...]}
+          const productsArray = data.products || data;
+          if (Array.isArray(productsArray)) {
+            setProducts(productsArray);
+          } else {
+            console.error("API did not return an array:", data);
+            setProducts([]);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch products:", error);
+        setProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
+  const filtered = products.filter((p) => {
+    const matchesSearch = 
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.description?.toLowerCase().includes(search.toLowerCase()) ||
+      p.tag?.name.toLowerCase().includes(search.toLowerCase());
+    return matchesSearch;
+  }).sort((a, b) => {
+    const priceA = a.recurringPlans[0]?.price ?? 0;
+    const priceB = b.recurringPlans[0]?.price ?? 0;
+    return sortAsc ? priceA - priceB : priceB - priceA;
+  });
 
   return (
     <div className="min-h-screen">
@@ -76,29 +136,21 @@ export default function ShopPage() {
           </Button>
         </div>
 
-        {/* Category chips */}
-        <div className="mt-6 flex flex-wrap gap-2">
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
-                activeCategory === cat
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background text-foreground hover:bg-accent"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+        {/* Product count */}
+        <div className="mt-4 text-sm text-muted-foreground">
+          {loading ? "Loading..." : `${filtered.length} ${filtered.length === 1 ? "product" : "products"} found`}
         </div>
       </section>
 
       {/* ── Product Grid ─────────────────────────────────── */}
       <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
-        {filtered.length === 0 ? (
+        {loading ? (
           <p className="py-20 text-center text-muted-foreground">
-            No products found. Try a different search or category.
+            Loading products...
+          </p>
+        ) : filtered.length === 0 ? (
+          <p className="py-20 text-center text-muted-foreground">
+            No products found. Try a different search.
           </p>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -116,19 +168,31 @@ export default function ShopPage() {
                 <Link href={`/shop/${product.id}`}>
                   <CardHeader className="p-0">
                     <div className="flex h-48 items-center justify-center bg-muted/50 transition-colors group-hover:bg-muted/70">
-                      <div className="flex h-24 w-24 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-accent/30 text-3xl font-bold text-primary">
-                        {product.name.charAt(0)}
-                      </div>
+                      {product.images.length > 0 ? (
+                        <img
+                          src={product.images[0].url}
+                          alt={product.images[0].alt || product.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-24 w-24 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-accent/30 text-3xl font-bold text-primary">
+                          {product.name.charAt(0)}
+                        </div>
+                      )}
                     </div>
                   </CardHeader>
                 </Link>
 
                 <CardContent className="p-5">
                   <div className="flex items-center gap-1.5">
-                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      {product.category}
-                    </p>
-                    <span className="text-muted-foreground/40">·</span>
+                    {product.tag && (
+                      <>
+                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          {product.tag.name}
+                        </p>
+                        <span className="text-muted-foreground/40">·</span>
+                      </>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       {PRODUCT_TYPES[product.type] ?? product.type}
                     </p>
@@ -146,61 +210,36 @@ export default function ShopPage() {
                   <div className="mt-2 flex items-center gap-1">
                     <Star className="h-3.5 w-3.5 fill-chart-4 text-chart-4" />
                     <span className="text-sm text-muted-foreground">
-                      {product.rating}
+                      {Number(product.averageRating).toFixed(1)}
                     </span>
                   </div>
 
-                  <div className="mt-3 flex items-baseline gap-1">
-                    <span className="text-2xl font-bold">
-                      ₹{product.monthlyPrice.toLocaleString()}
-                    </span>
-                    <span className="text-sm text-muted-foreground">/month</span>
-                  </div>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    or ₹{product.yearlyPrice.toLocaleString()}/year
-                    {product.recurringPlan && (
-                      <span className="ml-1">
-                        · {product.recurringPlan.billingPeriod.toLowerCase()} plan
-                      </span>
-                    )}
-                  </p>
-
-                  {product.variants.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {product.variants.slice(0, 3).map((v) => (
-                        <Badge
-                          key={`${v.attribute}-${v.value}`}
-                          variant="outline"
-                          className="text-[10px]"
-                        >
-                          {v.attribute}: {v.value}
-                          {v.extraPrice > 0 && ` +₹${v.extraPrice}`}
-                        </Badge>
-                      ))}
-                      {product.variants.length > 3 && (
-                        <Badge variant="outline" className="text-[10px]">
-                          +{product.variants.length - 3} more
-                        </Badge>
+                  {product.recurringPlans?.length > 0 && (
+                    <>
+                      <div className="mt-3 flex items-baseline gap-1">
+                        <span className="text-2xl font-bold">
+                          ₹{product.recurringPlans[0].price.toLocaleString()}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          /{product.recurringPlans[0].billingPeriod.toLowerCase()}
+                        </span>
+                      </div>
+                      {product.recurringPlans.length > 1 && (
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          +{product.recurringPlans.length - 1} more plan{product.recurringPlans.length > 2 ? "s" : ""} available
+                        </p>
                       )}
-                    </div>
+                    </>
                   )}
                 </CardContent>
 
                 <CardFooter className="px-5 pb-5 pt-0">
-                  <Button
-                    className="w-full gap-2"
-                    onClick={() =>
-                      addItem({
-                        product,
-                        quantity: 1,
-                        plan: "Monthly",
-                        selectedVariant: null,
-                      })
-                    }
-                  >
-                    <ShoppingCart className="h-4 w-4" />
-                    Add to Cart
-                  </Button>
+                  <Link href={`/shop/${product.id}`} className="w-full">
+                    <Button className="w-full gap-2">
+                      <ShoppingCart className="h-4 w-4" />
+                      View Details
+                    </Button>
+                  </Link>
                 </CardFooter>
               </Card>
             ))}

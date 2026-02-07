@@ -15,16 +15,29 @@ async function seed() {
 
     const hashedPassword = await bcryptjs.hash('admin123', 10); // Default password - change this!
 
-    const adminUser = await prisma.user.create({
-      data: {
-        email: 'admin@subly.com',
-        password: hashedPassword,
-        role: 'ADMIN',
-        verifiedAt: new Date(),
-      },
+    const adminUser = await prisma.user.createMany({
+        data: [
+            {
+                email: 'admin@subly.com',
+                password: hashedPassword,
+                role: 'ADMIN',
+                verifiedAt: new Date(),
+            },
+            {
+                email: 'a@g.com',
+                password: await bcryptjs.hash('a123', 10),
+                role: 'USER',
+                verifiedAt: new Date(),
+            },
+            {
+                email: 'b@g.com',
+                password: await bcryptjs.hash('b123', 10),
+                role: 'USER',
+                verifiedAt: new Date(),
+            }
+        ]
     });
 
-    console.log('Admin user seeded successfully:', adminUser.email);
   } catch (error) {
     console.error('Seeding error:', error);
     process.exit(1);

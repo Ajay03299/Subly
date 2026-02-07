@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcryptjs from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  saveRefreshToken,
+} from '@/lib/jwt';
 
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json();
 
-    // Validate input
     if (!email || !password) {
       return NextResponse.json(
         { error: 'Email and password are required' },
@@ -14,7 +18,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user already exists
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
@@ -26,13 +29,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Determine role based on email domain
     const role = email.endsWith('@subly.com') ? 'INTERNAL_USER' : 'USER';
 
-    // Hash password
     const hashedPassword = await bcryptjs.hash(password, 10);
 
-    // Create user (marked as verified for now)
     const user = await prisma.user.create({
       data: {
         email,
@@ -42,13 +42,27 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Return user data (without password)
+    // Generate JWT tokens
+    const payload = {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+    };
+
+    const accessToken = generateAccessToken(payload);
+    const refreshToken = generateRefreshToken(payload);
+
+    // Save refresh token to database
+    await saveRefreshToken(user.id, refreshToken);
+
     const { password: _, ...userWithoutPassword } = user;
 
     return NextResponse.json(
       {
         message: 'User created successfully',
         user: userWithoutPassword,
+        accessToken,
+        refreshToken,
       },
       { status: 201 }
     );

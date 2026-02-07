@@ -131,7 +131,6 @@ export async function GET(request: NextRequest) {
 
     // Fetch all products
     const products = await prisma.product.findMany({
-        tax: true,
       include: {
         variants: true,
         recurringPlans: true,

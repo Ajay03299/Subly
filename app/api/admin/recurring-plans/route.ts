@@ -133,8 +133,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch all recurring plans
+    // Fetch all recurring plans with relations
     const plans = await prisma.recurringPlan.findMany({
+      include: {
+        product: { select: { id: true, name: true, type: true, salesPrice: true } },
+        subscriptions: {
+          select: { id: true, subscriptionNo: true, status: true, totalAmount: true },
+          take: 50,
+        },
+      },
       orderBy: {
         createdAt: 'desc',
       },

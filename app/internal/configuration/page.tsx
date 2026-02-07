@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth-context";
 import { useProtectedRoute } from "@/hooks/useProtectedRoute";
-import { AlertCircle, Loader2, Pencil, Save, Trash2, X } from "lucide-react";
+import { AlertCircle, ArrowRight, Loader2, Pencil, RefreshCw, Save, Trash2, X } from "lucide-react";
 
 interface ProductTag {
   id: string;
@@ -164,10 +165,31 @@ export default function ConfigurationPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/30">
-      <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-4xl space-y-6 px-4 py-10 sm:px-6 lg:px-8">
+        {/* ── Quick Links ──────────────────────────────── */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Link href="/internal/configuration/recurring-plans">
+            <Card className="group cursor-pointer transition-shadow hover:shadow-md">
+              <CardContent className="flex items-center gap-4 py-5">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">
+                  <RefreshCw className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold">Recurring Plans</p>
+                  <p className="text-sm text-muted-foreground">
+                    Manage billing plans, pricing &amp; options
+                  </p>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+
+        {/* ── Product Tags ─────────────────────────────── */}
         <Card>
           <CardHeader>
-            <CardTitle>Configuration</CardTitle>
+            <CardTitle>Product Tags</CardTitle>
             <CardDescription>Manage product tags for the shop.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">

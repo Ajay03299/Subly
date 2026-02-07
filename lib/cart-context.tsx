@@ -36,7 +36,7 @@ export interface Product {
   name: string;
   category?: string;
   type: "SERVICE" | "CONSUMABLE" | "STORABLE";
-  description?: string;
+  description?: string | null;
   salesPrice?: number;
   monthlyPrice?: number;
   yearlyPrice?: number;

@@ -235,6 +235,7 @@ export default function ProductPage() {
   })();
 
   function handleAddToCart() {
+    if (!product) return;
     addItem({
       product,
       quantity,
@@ -463,7 +464,7 @@ export default function ProductPage() {
 
                     {openDropdown === attribute && (
                       <div className="absolute left-0 top-full z-20 mt-1 w-full rounded-lg border border-border bg-popover p-1 shadow-lg">
-                        {options.map((v) => {
+                        {options.map((v: { id: string; attribute: string; value: string; extraPrice: number }) => {
                           const isSelected =
                             selectedVariants[attribute]?.value === v.value;
                           return (

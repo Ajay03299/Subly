@@ -45,7 +45,7 @@ export async function GET(
       where: { id },
       include: {
         variants: true,
-        recurringPlan: true,
+        recurringPlans: true,
       },
     });
 
@@ -82,7 +82,7 @@ export async function PUT(
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    const { name, type, salesPrice, costPrice, recurringPlanId } =
+    const { name, type, salesPrice, costPrice } =
       await request.json();
 
     const product = await prisma.product.update({
@@ -96,9 +96,8 @@ export async function PUT(
         ...(costPrice !== undefined && {
           costPrice: parseFloat(costPrice),
         }),
-        recurringPlanId: recurringPlanId ?? null,
       },
-      include: { variants: true, recurringPlan: true },
+      include: { variants: true, recurringPlans: true },
     });
 
     return NextResponse.json(

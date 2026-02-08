@@ -2,6 +2,8 @@ import "server-only";
 
 import cron from "node-cron";
 import { prisma } from "@/lib/prisma";
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from "fs";
+import { join } from "path";
 
 const globalForCron = globalThis as unknown as {
   subscriptionRenewalTask?: cron.ScheduledTask;
@@ -9,6 +11,43 @@ const globalForCron = globalThis as unknown as {
 
 const DEFAULT_CRON = "0 2 * * *";
 const DEFAULT_TZ = "UTC";
+const LOG_DIR = join(process.cwd(), ".cron-logs");
+const LOG_FILE = join(LOG_DIR, "invoices.json");
+
+function logToFile(event: {
+  timestamp: string;
+  type: "invoice-created" | "payment-recorded" | "job-start" | "job-end";
+  subscriptionId?: string;
+  data: Record<string, unknown>;
+}) {
+  try {
+    if (!existsSync(LOG_DIR)) {
+      mkdirSync(LOG_DIR, { recursive: true });
+    }
+
+    let logs: typeof event[] = [];
+    if (existsSync(LOG_FILE)) {
+      try {
+        const content = readFileSync(LOG_FILE, "utf-8").trim();
+        if (content) {
+          logs = JSON.parse(content);
+          if (!Array.isArray(logs)) {
+            logs = [];
+          }
+        }
+      } catch (parseErr) {
+        console.warn("[subscription-renewal] Could not parse existing logs, starting fresh");
+        logs = [];
+      }
+    }
+
+    logs.push(event);
+    writeFileSync(LOG_FILE, JSON.stringify(logs, null, 2));
+    console.log(`[subscription-renewal] Event logged: ${event.type}`);
+  } catch (err) {
+    console.error("[subscription-renewal] Failed to log event:", err);
+  }
+}
 
 function isSameMonth(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
@@ -47,6 +86,15 @@ function shouldRenewMonthly(
 }
 
 export async function runSubscriptionRenewalJob() {
+  const jobStartTime = new Date();
+  console.log("[subscription-renewal] Job started at", jobStartTime.toISOString());
+
+  logToFile({
+    timestamp: jobStartTime.toISOString(),
+    type: "job-start",
+    data: { message: "Subscription renewal job started" },
+  });
+
   const now = new Date();
 
   const subscriptions = await prisma.subscription.findMany({
@@ -121,6 +169,23 @@ export async function runSubscriptionRenewalJob() {
       },
     });
 
+    console.log("[subscription-renewal] Invoice created:", {
+      invoiceNo,
+      subscriptionId: subscription.id,
+      totalAmount,
+    });
+
+    logToFile({
+      timestamp: now.toISOString(),
+      type: "invoice-created",
+      subscriptionId: subscription.id,
+      data: {
+        invoiceNo,
+        invoiceId: invoice.id,
+        totalAmount,
+      },
+    });
+
     await prisma.payment.create({
       data: {
         method: "CREDIT_CARD",
@@ -131,7 +196,31 @@ export async function runSubscriptionRenewalJob() {
         userId: subscription.userId,
       },
     });
+
+    console.log("[subscription-renewal] Payment recorded:", {
+      amount: totalAmount,
+      invoiceId: invoice.id,
+    });
+
+    logToFile({
+      timestamp: now.toISOString(),
+      type: "payment-recorded",
+      subscriptionId: subscription.id,
+      data: {
+        invoiceId: invoice.id,
+        amount: totalAmount,
+      },
+    });
   }
+
+  const jobEndTime = new Date();
+  console.log("[subscription-renewal] Job completed at", jobEndTime.toISOString());
+
+  logToFile({
+    timestamp: jobEndTime.toISOString(),
+    type: "job-end",
+    data: { message: "Subscription renewal job completed" },
+  });
 }
 
 export function startSubscriptionRenewalCron() {

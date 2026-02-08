@@ -136,19 +136,50 @@ function OrderConfirmationContent() {
     const taxRatio = computedSubtotal > 0 ? afterDiscount / computedSubtotal : 1;
 
     const taxGroups = new Map<string, { rate: number; name: string; amount: number }>();
-    order.lines.forEach((line) => {
-      const rate = Number(line.tax?.rate ?? line.taxRate ?? 0);
-      if (rate <= 0) return;
-      const lineTaxAmount = Number(line.unitPrice) * line.quantity * (rate / 100);
-      const key = line.tax?.id || `rate-${rate}`;
-      const name = line.tax?.name || `Tax (${rate.toFixed(0)}%)`;
-      const existing = taxGroups.get(key);
-      if (existing) {
-        existing.amount += lineTaxAmount;
-      } else {
-        taxGroups.set(key, { rate, name, amount: lineTaxAmount });
-      }
-    });
+    // order.lines.forEach((line) => {
+    //   const rate = Number(line.tax?.rate ?? line.taxRate ?? 0);
+    //   if (rate <= 0) return;
+    //   const lineTaxAmount = Number(line.unitPrice) * line.quantity * (rate / 100);
+    //   const key = line.tax?.id || `rate-${rate}`;
+    //   const name = line.tax?.name || `Tax (${rate.toFixed(0)}%)`;
+    //   const existing = taxGroups.get(key);
+    //   if (existing) {
+    //     existing.amount += lineTaxAmount;
+    //   } else {
+    //     taxGroups.set(key, { rate, name, amount: lineTaxAmount });
+    //   }
+    // });
+
+    // for(const line of order.lines){
+    //     const rate = Number(line.tax?.rate ?? line.taxRate ?? 0);
+    //     if (rate <= 0) return;
+    //     const lineTaxAmount = Number(line.unitPrice) * line.quantity * (rate / 100);
+    //     const key = line.tax?.id || `rate-${rate}`;
+    //     const name = line.tax?.name || `Tax (${rate.toFixed(0)}%)`;
+    //     const existing = taxGroups.get(key);
+    //     if (existing) {
+    //         existing.amount += lineTaxAmount;
+    //     } else {
+    //         taxGroups.set(key, { rate, name, amount: lineTaxAmount });
+    //     }
+    // }
+
+    const length = order.lines.length;
+    const count = 0;
+    while(count < length){
+        const line = order.lines[count];
+        const rate = Number(line.tax?.rate ?? line.taxRate ?? 0);
+        if (rate <= 0) return;
+        const lineTaxAmount = Number(line.unitPrice) * line.quantity * (rate / 100);
+        const key = line.tax?.id || `rate-${rate}`;
+        const name = line.tax?.name || `Tax (${rate.toFixed(0)}%)`;
+        const existing = taxGroups.get(key);
+        if (existing) {
+            existing.amount += lineTaxAmount;
+        } else {
+            taxGroups.set(key, { rate, name, amount: lineTaxAmount });
+        }
+    }
 
     const adjustedTaxBreakdown = Array.from(taxGroups.values()).map((tax) => ({
       ...tax,

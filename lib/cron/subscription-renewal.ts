@@ -224,15 +224,25 @@ export async function runSubscriptionRenewalJob() {
 }
 
 export function startSubscriptionRenewalCron() {
-  if (process.env.NEXT_RUNTIME === "edge") return;
-  if (globalForCron.subscriptionRenewalTask) return;
+  if (process.env.NEXT_RUNTIME === "edge") {
+    console.log("[subscription-renewal] Skipping: running in edge runtime");
+    return;
+  }
+  
+  if (globalForCron.subscriptionRenewalTask) {
+    console.log("[subscription-renewal] Cron already running");
+    return;
+  }
 
   const schedule = process.env.SUBSCRIPTION_RENEWAL_CRON ?? DEFAULT_CRON;
   const timezone = process.env.SUBSCRIPTION_RENEWAL_TZ ?? DEFAULT_TZ;
 
+  console.log(`[subscription-renewal] Starting cron job with schedule: ${schedule} (${timezone})`);
+
   const task = cron.schedule(
     schedule,
     () => {
+      console.log("[subscription-renewal] Cron triggered, running job...");
       runSubscriptionRenewalJob().catch((error) => {
         console.error("Subscription renewal cron failed:", error);
       });
@@ -241,4 +251,5 @@ export function startSubscriptionRenewalCron() {
   );
 
   globalForCron.subscriptionRenewalTask = task;
+  console.log("[subscription-renewal] Cron job started successfully!");
 }

@@ -3,7 +3,6 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthWrapper } from "@/components/auth-wrapper";
-import { startSubscriptionRenewalCron } from "@/lib/cron/subscription-renewal";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -22,8 +21,6 @@ export const metadata: Metadata = {
   description:
     "Manage your subscriptions, billing plans, and payments in one place.",
 };
-
-startSubscriptionRenewalCron();
 
 export default function RootLayout({
   children,

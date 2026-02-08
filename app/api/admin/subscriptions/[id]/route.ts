@@ -365,13 +365,14 @@ export async function PATCH(
 
         // Create a PAID invoice
         const invoiceNo = `INV/${String(Date.now()).slice(-6)}`;
+        const paidDueDate = existing.endDate ? new Date(existing.endDate) : new Date();
         const invoice = await prisma.invoice.create({
           data: {
             invoiceNo,
             subscriptionId: id,
             status: "PAID",
             issueDate: new Date(),
-            dueDate: new Date(),
+            dueDate: paidDueDate,
             subtotal: existing.subtotal,
             taxAmount: existing.taxAmount,
             totalAmount: existing.totalAmount,

@@ -64,7 +64,7 @@ export async function POST(
 
     const invoice = await prisma.invoice.findUnique({
       where: { id: invoiceId },
-      include: { subscription: true },
+      include: { subscription: true, payments: true },
     });
 
     if (!invoice) {
@@ -77,10 +77,34 @@ export async function POST(
       );
     }
 
+    const totalAmount = Number(invoice.totalAmount);
+    const alreadyPaid = invoice.payments.reduce(
+      (sum, p) => sum + Number(p.amount),
+      0
+    );
+    const amountDue = Math.round((totalAmount - alreadyPaid) * 100) / 100;
+
+    if (amountDue <= 0) {
+      return NextResponse.json(
+        { error: "Invoice is already fully paid" },
+        { status: 400 }
+      );
+    }
+
+    const amountRounded = Math.round(amount * 100) / 100;
+    if (Math.abs(amountRounded - amountDue) > 0.01) {
+      return NextResponse.json(
+        {
+          error: `Payment must equal the amount due (₹${amountDue.toFixed(2)}). Cannot pay a different amount.`,
+        },
+        { status: 400 }
+      );
+    }
+
     await prisma.payment.create({
       data: {
         method: method as "CREDIT_CARD" | "DEBIT_CARD" | "BANK_TRANSFER" | "UPI" | "CASH" | "OTHER",
-        amount,
+        amount: amountDue,
         paymentDate,
         subscriptionId: invoice.subscriptionId,
         invoiceId: invoice.id,

@@ -1,15 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcryptjs from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
+import { validatePassword } from '@/lib/auth/validation';
 
 export async function POST(request: NextRequest) {
   try {
     const { email, newPassword } = await request.json();
 
-    // Validate input
     if (!email || !newPassword) {
       return NextResponse.json(
         { error: 'Email and new password are required' },
+        { status: 400 }
+      );
+    }
+
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      return NextResponse.json(
+        { error: passwordValidation.error },
         { status: 400 }
       );
     }

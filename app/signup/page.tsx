@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
+import { validatePassword, PASSWORD_RULES } from "@/lib/auth/validation";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -25,11 +26,23 @@ export default function SignupPage() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
 
+    const emailTrimmed = email.trim().toLowerCase();
+    if (!emailTrimmed) {
+      setError("Email is required");
+      return;
+    }
+
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      setError(passwordValidation.error ?? "Invalid password");
+      return;
+    }
+
+    setLoading(true);
     try {
-      await signup(email, password);
+      await signup(emailTrimmed, password);
       // Redirect is handled by the auth context
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign up failed");
@@ -69,6 +82,11 @@ export default function SignupPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
+              <ul className="text-xs text-muted-foreground list-disc list-inside space-y-0.5">
+                {PASSWORD_RULES.map((rule) => (
+                  <li key={rule}>{rule}</li>
+                ))}
+              </ul>
             </div>
 
             {error && (

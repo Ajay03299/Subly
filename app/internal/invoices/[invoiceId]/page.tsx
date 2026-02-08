@@ -111,7 +111,6 @@ export default function InternalInvoicePage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("CASH");
-  const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState(
     new Date().toISOString().slice(0, 10)
   );
@@ -123,6 +122,7 @@ export default function InternalInvoicePage() {
       setLoading(true);
       const res = await fetch(`/api/admin/invoices/${invoiceId}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
+        cache: "no-store",
       });
       if (!res.ok) {
         if (res.status === 404) {
@@ -201,12 +201,15 @@ export default function InternalInvoicePage() {
     }
   };
 
+  const amountDue = invoice
+    ? Math.max(
+        0,
+        Number(invoice.totalAmount) -
+          (invoice.payments?.reduce((s, p) => s + Number(p.amount), 0) ?? 0)
+      )
+    : 0;
+
   const handleRecordPayment = async () => {
-    const amount = Number(paymentAmount);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setError("Enter a valid amount");
-      return;
-    }
     setActionLoading(true);
     setError(null);
     try {
@@ -218,7 +221,7 @@ export default function InternalInvoicePage() {
         },
         body: JSON.stringify({
           method: paymentMethod,
-          amount,
+          amount: amountDue,
           paymentDate: paymentDate || new Date().toISOString().slice(0, 10),
         }),
       });
@@ -229,7 +232,6 @@ export default function InternalInvoicePage() {
       const data = await res.json();
       setInvoice(data.invoice);
       setPaymentOpen(false);
-      setPaymentAmount("");
       setSuccess("Payment recorded");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Payment failed");
@@ -518,10 +520,7 @@ export default function InternalInvoicePage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  setPaymentOpen(false);
-                  setPaymentAmount("");
-                }}
+                onClick={() => setPaymentOpen(false)}
               >
                 Discard
               </Button>
@@ -545,14 +544,12 @@ export default function InternalInvoicePage() {
               </div>
               <div>
                 <Label>Amount</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value)}
-                />
+                <p className="rounded-md border border-input bg-muted/50 px-3 py-2 text-sm font-medium">
+                  {formatCurrency(amountDue)} (invoice total due)
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Payment must be for the full amount due.
+                </p>
               </div>
               <div>
                 <Label>Payment date</Label>
@@ -565,10 +562,7 @@ export default function InternalInvoicePage() {
               <div className="flex justify-end gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    setPaymentOpen(false);
-                    setPaymentAmount("");
-                  }}
+                  onClick={() => setPaymentOpen(false)}
                 >
                   Discard
                 </Button>

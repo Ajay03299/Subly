@@ -164,7 +164,7 @@ export function Navbar() {
                       className="w-full"
                       onClick={() => setConfigOpen(false)}
                     >
-                      <Link href="/internal/taxes">Manage Taxes</Link>
+                      <Link href="/internal/configuration/taxes">Manage Taxes</Link>
                     </Button>
                   </div>
                 </div>

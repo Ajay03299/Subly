@@ -103,6 +103,7 @@ export async function runSubscriptionRenewalJob() {
 
     const totalAmount = subtotal + taxAmount;
     const invoiceNo = `INV-${subscription.subscriptionNo}-${now.getTime()}`;
+    const invoiceDueDate = subscription.endDate ? new Date(subscription.endDate) : now;
 
     const invoice = await prisma.invoice.create({
       data: {
@@ -110,7 +111,7 @@ export async function runSubscriptionRenewalJob() {
         subscriptionId: subscription.id,
         status: "PAID",
         issueDate: now,
-        dueDate: now,
+        dueDate: invoiceDueDate,
         subtotal,
         taxAmount,
         totalAmount,

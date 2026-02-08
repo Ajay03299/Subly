@@ -139,6 +139,7 @@ export async function POST(request: NextRequest) {
       discountAmount,
       discountCode,
       paymentTerms,
+      endDate, // optional; used as invoice due date
     } = body;
 
     if (!items || items.length === 0) {
@@ -256,6 +257,7 @@ export async function POST(request: NextRequest) {
         subscriptionNo,
         userId,
         paymentTerms: paymentTerms || "IMMEDIATE",
+        endDate: endDate ? new Date(endDate) : null,
         status: "ACTIVE",
         discountCode: discountCode || null,
         discountAmount: appliedDiscountAmount,
@@ -276,6 +278,7 @@ export async function POST(request: NextRequest) {
 
     // ── Create Invoice (PAID) ────────────────────────────
     const invoiceNo = `INV/${String(Date.now()).slice(-6)}`;
+    const invoiceDueDate = subscription.endDate ? new Date(subscription.endDate) : new Date();
 
     const invoice = await prisma.invoice.create({
       data: {
@@ -283,7 +286,7 @@ export async function POST(request: NextRequest) {
         subscriptionId: subscription.id,
         status: "PAID",
         issueDate: new Date(),
-        dueDate: new Date(), // paid immediately
+        dueDate: invoiceDueDate,
         subtotal: computedSubtotal,
         taxAmount: computedTax,
         totalAmount: computedTotal,
@@ -326,14 +329,16 @@ export async function POST(request: NextRequest) {
     // Create initial invoice (same structure as internal create_invoice)
     if (subscription) {
       const issueDate = new Date();
-      const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const draftDueDate = subscription.endDate
+        ? new Date(subscription.endDate)
+        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
       await prisma.invoice.create({
         data: {
           invoiceNo: `INV-${subscription.subscriptionNo}`,
           subscriptionId: subscription.id,
           status: "DRAFT",
           issueDate,
-          dueDate,
+          dueDate: draftDueDate,
           subtotal: computedSubtotal,
           taxAmount: computedTax,
           totalAmount: computedTotal,

@@ -570,7 +570,6 @@ export default function SubscriptionsPage() {
                 setActiveSubscription(null);
               }}
               loading={loading}
-              hideCreateInvoice={fromInvoice}
               onOpenSubscription={(id) => {
                 setView(id);
                 fetchSubscription(id);

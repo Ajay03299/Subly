@@ -188,6 +188,9 @@ export function InternalNavbar() {
                   <Button asChild variant="outline" size="sm" className="w-full" onClick={() => setConfigOpen(false)}>
                     <Link href="/internal/configuration/discounts">Discounts</Link>
                   </Button>
+                  <Button asChild variant="outline" size="sm" className="w-full" onClick={() => setConfigOpen(false)}>
+                    <Link href="/internal/configuration/taxes">Taxes</Link>
+                  </Button>
                 </div>
               )}
             </div>

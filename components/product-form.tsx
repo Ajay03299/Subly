@@ -55,6 +55,13 @@ interface RecurringPlanInfo {
   plan?: RecurringPlan; // Populated when fetching existing data
 }
 
+interface Attribute {
+  id: string;
+  name: string;
+  value: string;
+  extraPrice: number;
+}
+
 interface ProductFormProps {
   onSubmit: (data: any) => Promise<void>;
   loading?: boolean;
@@ -84,9 +91,12 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
   );
   const [planEndDate, setPlanEndDate] = useState("");
 
+  // Attributes & Variants
+  const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
-  const [variantAttribute, setVariantAttribute] = useState("");
-  const [variantValue, setVariantValue] = useState("");
+  
+  // Variant form state
+  const [selectedAttributeId, setSelectedAttributeId] = useState("");
   const [variantExtraPrice, setVariantExtraPrice] = useState("");
 
   const [error, setError] = useState<string | null>(null);
@@ -130,27 +140,60 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
         // silent
       }
     };
+    const fetchAttributes = async () => {
+      try {
+        const res = await fetch("/api/admin/attributes", {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setAttributes(data.attributes || []);
+      } catch {
+        // silent
+      }
+    };
 
     fetchTags();
     fetchTaxes();
     fetchRecurringPlans();
+    fetchAttributes();
   }, []);
 
+  // When attribute selection changes, update price
+  useEffect(() => {
+    if (!selectedAttributeId) {
+      setVariantExtraPrice("");
+      return;
+    }
+    const attr = attributes.find(a => a.id === selectedAttributeId);
+    if (attr) {
+      setVariantExtraPrice(attr.extraPrice.toString());
+    }
+  }, [selectedAttributeId, attributes]);
+
   const addVariant = () => {
-    if (!variantAttribute || !variantValue) {
-      setError("Please fill in attribute and value");
+    if (!selectedAttributeId) {
+      setError("Please select an attribute variant");
       return;
     }
 
+    const attr = attributes.find(a => a.id === selectedAttributeId);
+    if (!attr) return;
+
+    // Check if duplicate
+    if (variants.some(v => v.attribute === attr.name && v.value === attr.value)) {
+        setError("This variant already exists");
+        return;
+    }
+
     const newVariant: Variant = {
-      attribute: variantAttribute,
-      value: variantValue,
+      attribute: attr.name,
+      value: attr.value,
       extraPrice: variantExtraPrice ? parseFloat(variantExtraPrice) : 0,
     };
 
     setVariants([...variants, newVariant]);
-    setVariantAttribute("");
-    setVariantValue("");
+    setSelectedAttributeId("");
     setVariantExtraPrice("");
     setError(null);
   };
@@ -444,37 +487,35 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="variantAttribute">Attribute (e.g., Tier)</Label>
-            <Input
-              id="variantAttribute"
-              value={variantAttribute}
-              onChange={(e) => setVariantAttribute(e.target.value)}
-              placeholder="e.g., Tier, Region, Color"
-            />
+            <Label htmlFor="variantAttribute">Select Attribute Variant</Label>
+            <Select value={selectedAttributeId} onValueChange={setSelectedAttributeId}>
+              <SelectTrigger id="variantAttribute">
+                <SelectValue placeholder="Select attribute (e.g. Color: Red)" />
+              </SelectTrigger>
+              <SelectContent>
+                {attributes.length === 0 ? (
+                    <SelectItem value="no-attrs" disabled>No attributes configured</SelectItem>
+                ) : (
+                    attributes.map(attr => (
+                        <SelectItem key={attr.id} value={attr.id}>
+                            {attr.name}: {attr.value} (+₹{Number(attr.extraPrice).toFixed(2)})
+                        </SelectItem>
+                    ))
+                )}
+              </SelectContent>
+            </Select>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="variantValue">Value (e.g., Enterprise)</Label>
-              <Input
-                id="variantValue"
-                value={variantValue}
-                onChange={(e) => setVariantValue(e.target.value)}
-                placeholder="e.g., Enterprise, Standard"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="variantExtraPrice">Extra Price</Label>
-              <Input
-                id="variantExtraPrice"
-                type="number"
-                step="0.01"
-                value={variantExtraPrice}
-                onChange={(e) => setVariantExtraPrice(e.target.value)}
-                placeholder="0.00"
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="variantExtraPrice">Extra Price (Override)</Label>
+            <Input
+              id="variantExtraPrice"
+              type="number"
+              step="0.01"
+              value={variantExtraPrice}
+              onChange={(e) => setVariantExtraPrice(e.target.value)}
+              placeholder="0.00"
+            />
           </div>
 
           <Button
@@ -592,8 +633,6 @@ export function ProductForm({ onSubmit, loading = false }: ProductFormProps) {
               </div>
             </div>
 
-=======
->>>>>>> 94ddf81 (Seed for Tax and Tag and also added RecurringPlanInfos)
             <Button
               type="button"
               onClick={addRecurringPlanInfo}

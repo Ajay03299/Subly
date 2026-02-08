@@ -17,8 +17,8 @@ function init(): MemoryDB {
     const now = new Date().toISOString();
     g.__subly_memory_db = {
       users: [
-        { id: uid("usr"), email: "admin@subly.dev", role: "ADMIN", verifiedAt: now, createdAt: now },
-        { id: uid("usr"), email: "ops@subly.dev", role: "INTERNAL", verifiedAt: now, createdAt: now },
+        { id: uid("usr"), email: "admin@subly.dev", role: "ADMIN", verifiedAt: now, createdAt: now, phone: null, address: null },
+        { id: uid("usr"), email: "ops@subly.dev", role: "INTERNAL", verifiedAt: now, createdAt: now, phone: null, address: null },
       ],
       contacts: [
         {

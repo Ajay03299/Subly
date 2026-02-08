@@ -297,7 +297,7 @@ export async function GET(request: NextRequest) {
           customer: s.user.email,
           status: s.status,
           totalAmount: Number(s.totalAmount),
-          plan: s.recurringPlan ? `₹${Number(s.recurringPlan.price)}/${s.recurringPlan.billingPeriod.toLowerCase()}` : "—",
+          plan: s.recurringPlan ? s.recurringPlan.billingPeriod : "—",
           billingPeriod: s.recurringPlan?.billingPeriod || "—",
           createdAt: s.createdAt,
         })),

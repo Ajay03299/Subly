@@ -403,7 +403,7 @@ export default function RecurringPlansPage() {
           </div>
         )}
         {success && (
-          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm text-emerald-600 dark:text-emerald-400">
+          <div className="rounded-lg border border-brand/30 bg-brand-muted p-3 text-sm text-brand">
             {success}
           </div>
         )}

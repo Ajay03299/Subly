@@ -21,7 +21,7 @@ export function TaxBreakdown({
       </div>
 
       {discountAmount > 0 && (
-        <div className="flex justify-between text-green-600">
+        <div className="flex justify-between text-brand">
           <span>Discount</span>
           <span>−₹{discountAmount.toLocaleString()}</span>
         </div>

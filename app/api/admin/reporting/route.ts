@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: "desc" },
         include: {
           user: { select: { email: true } },
-          recurringPlan: { select: { price: true, billingPeriod: true } },
+          recurringPlan: { select: { billingPeriod: true } },
         },
       }),
 

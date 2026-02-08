@@ -1,19 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth-context";
 import { useProtectedRoute } from "@/hooks/useProtectedRoute";
-import { AlertCircle, ArrowRight, Loader2, Pencil, RefreshCw, Save, Trash2, X } from "lucide-react";
-
-interface ProductTag {
-  id: string;
-  name: string;
-  createdAt: string;
-}
+import { Loader2, Tag, RefreshCw, FileText, Grid3x3, Percent } from "lucide-react";
+import Link from "next/link";
+import { Card, CardContent } from "@/components/ui/card";
+import { ArrowRight } from "lucide-react";
 
 export default function ConfigurationPage() {
   const { user } = useAuth();
@@ -22,130 +14,6 @@ export default function ConfigurationPage() {
     allowedRoles: ["ADMIN"],
     redirectTo: "/internal",
   });
-
-  const [tags, setTags] = useState<ProductTag[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [newTag, setNewTag] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingName, setEditingName] = useState("");
-
-  const getToken = () => localStorage.getItem("accessToken") ?? "";
-
-  const fetchTags = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/admin/product-tags", {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      if (!res.ok) throw new Error("Failed to fetch tags");
-      const data = await res.json();
-      setTags(data.tags || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load tags");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!authLoading && user?.role === "ADMIN") {
-      fetchTags();
-    }
-  }, [authLoading, user?.role]);
-
-  const handleCreate = async () => {
-    if (!newTag.trim()) {
-      setError("Tag name is required");
-      return;
-    }
-
-    try {
-      setError(null);
-      const res = await fetch("/api/admin/product-tags", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getToken()}`,
-        },
-        body: JSON.stringify({ name: newTag.trim() }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to create tag");
-      }
-
-      const data = await res.json();
-      setTags((prev) => [data.tag, ...prev].sort((a, b) => a.name.localeCompare(b.name)));
-      setNewTag("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create tag");
-    }
-  };
-
-  const startEdit = (tag: ProductTag) => {
-    setEditingId(tag.id);
-    setEditingName(tag.name);
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditingName("");
-  };
-
-  const handleUpdate = async (id: string) => {
-    if (!editingName.trim()) {
-      setError("Tag name is required");
-      return;
-    }
-
-    try {
-      setError(null);
-      const res = await fetch(`/api/admin/product-tags/${id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${getToken()}`,
-          },
-          body: JSON.stringify({ name: editingName.trim() }),
-        }
-      );
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to update tag");
-      }
-
-      const data = await res.json();
-      setTags((prev) => prev.map((t) => (t.id === id ? data.tag : t)));
-      cancelEdit();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update tag");
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    try {
-      setError(null);
-      const res = await fetch(`/api/admin/product-tags/${id}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${getToken()}` },
-        }
-      );
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to delete tag");
-      }
-
-      setTags((prev) => prev.filter((t) => t.id !== id));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete tag");
-    }
-  };
 
   if (authLoading || !user) {
     return (
@@ -163,107 +31,76 @@ export default function ConfigurationPage() {
     );
   }
 
+  const configurationOptions = [
+    {
+      title: "Product Tags",
+      description: "Manage product tags for categorizing shop items",
+      icon: Tag,
+      href: "/internal/configuration/tags",
+    },
+    {
+      title: "Recurring Plans",
+      description: "Configure billing cycles, pricing, and subscription options",
+      icon: RefreshCw,
+      href: "/internal/configuration/recurring-plans",
+    },
+    {
+      title: "Quotation Templates",
+      description: "Create and manage quotation templates for subscriptions",
+      icon: FileText,
+      href: "/internal/configuration/quotation-templates",
+    },
+    {
+      title: "Product Attributes",
+      description: "Define product variants and custom attributes",
+      icon: Grid3x3,
+      href: "/internal/configuration/attributes",
+    },
+    {
+      title: "Discounts",
+      description: "Create and manage discount codes and promotional offers",
+      icon: Percent,
+      href: "/internal/configuration/discounts",
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/30">
-      <div className="mx-auto max-w-4xl space-y-6 px-4 py-10 sm:px-6 lg:px-8">
-        {/* ── Quick Links ──────────────────────────────── */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Link href="/internal/configuration/recurring-plans">
-            <Card className="group cursor-pointer transition-shadow hover:shadow-md">
-              <CardContent className="flex items-center gap-4 py-5">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">
-                  <RefreshCw className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold">Recurring Plans</p>
-                  <p className="text-sm text-muted-foreground">
-                    Manage billing plans, pricing &amp; options
-                  </p>
-                </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-              </CardContent>
-            </Card>
-          </Link>
+      <div className="mx-auto max-w-6xl space-y-8 px-4 py-10 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Configuration</h1>
+          <p className="mt-2 text-muted-foreground">
+            Manage all your system settings and product configurations
+          </p>
         </div>
 
-        {/* ── Product Tags ─────────────────────────────── */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Product Tags</CardTitle>
-            <CardDescription>Manage product tags for the shop.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {error && (
-              <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-                <AlertCircle className="h-4 w-4" />
-                {error}
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <Input
-                value={newTag}
-                onChange={(e) => setNewTag(e.target.value)}
-                placeholder="Add a new product tag"
-              />
-              <Button onClick={handleCreate}>Add</Button>
-            </div>
-
-            {loading ? (
-              <div className="flex items-center justify-center py-10">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : tags.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No tags created yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {tags.map((tag) => (
-                  <div
-                    key={tag.id}
-                    className="flex items-center justify-between rounded-lg border border-border bg-card p-3"
-                  >
-                    {editingId === tag.id ? (
-                      <Input
-                        value={editingName}
-                        onChange={(e) => setEditingName(e.target.value)}
-                        className="mr-3"
-                      />
-                    ) : (
-                      <span className="text-sm font-medium">{tag.name}</span>
-                    )}
-
-                    <div className="flex items-center gap-2">
-                      {editingId === tag.id ? (
-                        <>
-                          <Button size="sm" onClick={() => handleUpdate(tag.id)}>
-                            <Save className="h-4 w-4" />
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={cancelEdit}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button size="sm" variant="ghost" onClick={() => startEdit(tag)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => handleDelete(tag.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
+        {/* Configuration Cards Grid */}
+        <div className="grid gap-6 sm:grid-cols-2">
+          {configurationOptions.map((option) => {
+            const Icon = option.icon;
+            return (
+              <Link key={option.href} href={option.href}>
+                <Card className="group h-full cursor-pointer transition-all hover:border-primary/50 hover:shadow-lg">
+                  <CardContent className="flex flex-col gap-4 p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">
+                        <Icon className="h-6 w-6 text-primary" />
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    <div>
+                      <h3 className="font-semibold">{option.title}</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {option.description}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

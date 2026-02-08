@@ -107,22 +107,22 @@ export default function AttributesPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted/30">
+      <div className="mx-auto max-w-5xl space-y-6 px-4 py-10 sm:px-6 lg:px-8">
+        {/* Header */}
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
             <Settings className="h-6 w-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Attributes</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-3xl font-bold tracking-tight">Product Attributes</h1>
+            <p className="mt-1 text-muted-foreground">
               Manage product attributes and variants
             </p>
           </div>
         </div>
-      </div>
 
-      <Card>
+        <Card>
         <CardHeader>
           <CardTitle>Create Attribute</CardTitle>
           <CardDescription>Add a new attribute variant (e.g., Color: Red)</CardDescription>
@@ -203,6 +203,7 @@ export default function AttributesPage() {
           )}
         </CardContent>
       </Card>
+          </div>
     </div>
   );
 }

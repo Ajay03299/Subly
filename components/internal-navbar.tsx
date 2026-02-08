@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 
 const NAV_TABS = [
+  { label: "Dashboard", href: "/internal" },
   { label: "Subscriptions", href: "/internal/subscriptions" },
   { label: "Products", href: "/internal/products" },
   { label: "Reporting", href: "/internal/reporting" },
@@ -29,32 +30,11 @@ export function InternalNavbar() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const configRef = useRef<HTMLDivElement | null>(null);
-  const [tagName, setTagName] = useState("");
-  const [tagError, setTagError] = useState<string | null>(null);
-  const [tags, setTags] = useState<Array<{ id: string; name: string }>>([]);
-  const [tagLoading, setTagLoading] = useState(false);
   const { user, logout } = useAuth();
 
   const getToken = () => localStorage.getItem("accessToken") ?? "";
 
-  useEffect(() => {
-    if (!configOpen || user?.role !== "ADMIN") return;
 
-    const fetchTags = async () => {
-      try {
-        const res = await fetch("/api/admin/product-tags", {
-          headers: { Authorization: `Bearer ${getToken()}` },
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        setTags(data.tags || []);
-      } catch {
-        // silent
-      }
-    };
-
-    fetchTags();
-  }, [configOpen, user?.role]);
 
   useEffect(() => {
     if (!configOpen) return;
@@ -70,40 +50,7 @@ export function InternalNavbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [configOpen]);
 
-  const handleAddTag = async () => {
-    if (!tagName.trim()) {
-      setTagError("Tag name is required");
-      return;
-    }
 
-    try {
-      setTagLoading(true);
-      setTagError(null);
-      const res = await fetch("/api/admin/product-tags", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getToken()}`,
-        },
-        body: JSON.stringify({ name: tagName.trim() }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to create tag");
-      }
-
-      const data = await res.json();
-      setTags((prev) =>
-        [data.tag, ...prev].sort((a, b) => a.name.localeCompare(b.name))
-      );
-      setTagName("");
-    } catch (err) {
-      setTagError(err instanceof Error ? err.message : "Failed to create tag");
-    } finally {
-      setTagLoading(false);
-    }
-  };
 
   // Get user name from email
   const userName = user?.email?.split("@")[0]?.charAt(0).toUpperCase() + user?.email?.split("@")[0]?.slice(1) || "User";
@@ -180,7 +127,9 @@ export function InternalNavbar() {
         <div className="-mb-px flex gap-1 overflow-visible">
           <div className="flex gap-1 overflow-x-auto">
             {NAV_TABS.map((tab) => {
-              const isActive = pathname.startsWith(tab.href);
+              const isActive = tab.href === "/internal"
+                ? pathname === "/internal" || pathname === "/internal/"
+                : pathname.startsWith(tab.href);
               return (
                 <Link
                   key={tab.href}
@@ -220,23 +169,25 @@ export function InternalNavbar() {
               </Button>
 
               {configOpen && (
-                <div className="absolute left-0 mt-2 w-72 rounded-lg border border-border bg-popover p-3 shadow-lg">
-                  <Button asChild variant="outline" size="sm" className="mb-3 w-full" onClick={() => setConfigOpen(false)}>
-                    <Link href="/internal/configuration/attributes">Manage Attributes</Link>
-                  </Button>
-                  <Button asChild variant="outline" size="sm" className="mb-3 w-full" onClick={() => setConfigOpen(false)}>
-                    <Link href="/internal/configuration">Manage Product Tags</Link>
-                  </Button>
-                  <Button asChild variant="outline" size="sm" className="mb-3 w-full" onClick={() => setConfigOpen(false)}>
-                    <Link href="/internal/discounts">Manage Discounts</Link>
+                <div className="absolute left-0 mt-2 w-72 rounded-lg border border-border bg-popover p-3 shadow-lg space-y-2">
+                  <Button asChild variant="outline" size="sm" className="w-full" onClick={() => setConfigOpen(false)}>
+                    <Link href="/internal/configuration">Configuration Home</Link>
                   </Button>
                   <Button asChild variant="outline" size="sm" className="w-full" onClick={() => setConfigOpen(false)}>
-                    <Link href="/internal/taxes">Manage Taxes</Link>
+                    <Link href="/internal/configuration/tags">Product Tags</Link>
                   </Button>
-
-                  {tagError && (
-                    <div className="mt-2 text-xs text-destructive">{tagError}</div>
-                  )}
+                  <Button asChild variant="outline" size="sm" className="w-full" onClick={() => setConfigOpen(false)}>
+                    <Link href="/internal/configuration/recurring-plans">Recurring Plans</Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm" className="w-full" onClick={() => setConfigOpen(false)}>
+                    <Link href="/internal/configuration/quotation-templates">Quotation Templates</Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm" className="w-full" onClick={() => setConfigOpen(false)}>
+                    <Link href="/internal/configuration/attributes">Attributes</Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm" className="w-full" onClick={() => setConfigOpen(false)}>
+                    <Link href="/internal/configuration/discounts">Discounts</Link>
+                  </Button>
                 </div>
               )}
             </div>

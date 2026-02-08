@@ -319,21 +319,19 @@ export default function QuotationTemplatesPage() {
   /* ── Render ────────────────────────────────────────── */
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/30">
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-5xl space-y-6 px-4 py-10 sm:px-6 lg:px-8">
         {/* ── Header ────────────────────────────────────── */}
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
-              <FileText className="h-6 w-6 text-primary-foreground" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+              <FileText className="h-6 w-6 text-primary" />
             </div>
             <div>
               <h1 className="text-3xl font-bold tracking-tight">
                 Quotation Templates
               </h1>
-              <p className="text-muted-foreground">
-                {view === "list"
-                  ? `${templates.length} template${templates.length !== 1 ? "s" : ""}`
-                  : "Create a new template"}
+              <p className="mt-1 text-muted-foreground">
+                Create and manage quotation templates for subscriptions
               </p>
             </div>
           </div>

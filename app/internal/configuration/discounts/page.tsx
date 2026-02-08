@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertCircle, Loader2, Pencil, Save, Trash2, X } from "lucide-react";
+import { AlertCircle, Loader2, Pencil, Save, Trash2, X, Percent } from "lucide-react";
 
 interface Discount {
   id: string;
@@ -246,11 +246,24 @@ export default function DiscountsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/30">
-      <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-5xl space-y-6 px-4 py-10 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+            <Percent className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Discounts</h1>
+            <p className="mt-1 text-muted-foreground">
+              Create and manage discount codes and promotional offers
+            </p>
+          </div>
+        </div>
+
         <Card>
           <CardHeader>
-            <CardTitle>Discounts</CardTitle>
-            <CardDescription>Create and manage discount codes.</CardDescription>
+            <CardTitle>Create New Discount</CardTitle>
+            <CardDescription>Add a new discount offer.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {error && (

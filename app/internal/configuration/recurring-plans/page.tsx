@@ -678,52 +678,47 @@ export default function RecurringPlansPage() {
   /*  LIST VIEW                                               */
   /* ════════════════════════════════════════════════════════ */
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted/30">
+      <div className="mx-auto max-w-5xl space-y-6 px-4 py-10 sm:px-6 lg:px-8">
+        {/* Header */}
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/internal/configuration">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
-            <RefreshCw className="h-6 w-6 text-primary-foreground" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+            <RefreshCw className="h-6 w-6 text-primary" />
           </div>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
               Recurring Plans
             </h1>
-            <p className="text-muted-foreground">
-              {plans.length} plan{plans.length !== 1 ? "s" : ""} total
+            <p className="mt-1 text-muted-foreground">
+              Configure billing cycles and subscription options
             </p>
           </div>
         </div>
 
-        <Button className="gap-2" onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          New Plan
-        </Button>
-      </div>
+        {/* Messages */}
+        {error && (
+          <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {error}
+          </div>
+        )}
 
-      {/* Messages */}
-      {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          {error}
+        {/* Filters */}
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search plans..."
+              className="pl-9"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <Button className="gap-2" onClick={openCreate}>
+            <Plus className="h-4 w-4" />
+            New Plan
+          </Button>
         </div>
-      )}
-
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search plans..."
-          className="pl-9"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
 
       {/* Table */}
       {loading ? (
@@ -812,6 +807,7 @@ export default function RecurringPlansPage() {
           </Table>
         </Card>
       )}
+      </div>
     </div>
   );
 }

@@ -223,7 +223,13 @@ model Subscription {
   recurringPlanId String?
   recurringPlan   RecurringPlan? @relation(fields: [recurringPlanId], references: [id])
 
-  paymentTerms String? // e.g. "Net 30", "Due on Receipt"
+  paymentTerms    String? // e.g. "Net 30", "Due on Receipt"
+  paymentTermConfig Json? // { earlyDiscount?: number, dueTerms?: Array<{ due: string, after: string }> }
+
+  // When this subscription was created from Renew or Upsell, link to the original
+  parentSubscriptionId String?
+  parentSubscription   Subscription?  @relation("SubscriptionHistory", fields: [parentSubscriptionId], references: [id])
+  childSubscriptions   Subscription[]  @relation("SubscriptionHistory")
 
   status SubscriptionStatus @default(DRAFT)
 
@@ -245,6 +251,7 @@ model Subscription {
 
   @@index([userId])
   @@index([status])
+  @@index([parentSubscriptionId])
   @@map("subscriptions")
 }
 

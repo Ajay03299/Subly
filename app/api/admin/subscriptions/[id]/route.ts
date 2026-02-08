@@ -75,6 +75,15 @@ export async function GET(
           },
         },
         payments: true,
+        childSubscriptions: {
+          select: {
+            id: true,
+            subscriptionNo: true,
+            status: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
 
@@ -203,6 +212,7 @@ export async function PATCH(
           userId: existing.userId,
           recurringPlanId: existing.recurringPlanId,
           paymentTerms: existing.paymentTerms,
+          parentSubscriptionId: id,
           status: "ACTIVE",
           subtotal: existing.subtotal,
           taxAmount: existing.taxAmount,
@@ -210,6 +220,7 @@ export async function PATCH(
           lines: {
             create: existing.lines.map((line) => ({
               productId: line.productId,
+              taxId: line.taxId ?? undefined,
               quantity: line.quantity,
               unitPrice: line.unitPrice,
               taxRate: line.taxRate,
@@ -241,6 +252,7 @@ export async function PATCH(
           userId: existing.userId,
           recurringPlanId: existing.recurringPlanId,
           paymentTerms: existing.paymentTerms,
+          parentSubscriptionId: id,
           status: "DRAFT",
           subtotal: existing.subtotal,
           taxAmount: existing.taxAmount,
@@ -248,6 +260,7 @@ export async function PATCH(
           lines: {
             create: existing.lines.map((line) => ({
               productId: line.productId,
+              taxId: line.taxId ?? undefined,
               quantity: line.quantity,
               unitPrice: line.unitPrice,
               taxRate: line.taxRate,
@@ -269,32 +282,41 @@ export async function PATCH(
       );
     }
 
-    // Handle "create_invoice" action
+    // Handle "create_invoice" action — same structure as portal checkout for consistency
     if (body.action === "create_invoice") {
       const invoiceNo = `INV/${String(Date.now()).slice(-6)}`;
+      const issueDate = new Date();
+      const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
       const invoice = await prisma.invoice.create({
         data: {
           invoiceNo,
           subscriptionId: id,
           status: "DRAFT",
-          issueDate: new Date(),
-          dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          issueDate,
+          dueDate,
           subtotal: existing.subtotal,
           taxAmount: existing.taxAmount,
           totalAmount: existing.totalAmount,
           lines: {
-            create: existing.lines.map((line) => ({
-              productId: line.productId,
-              quantity: line.quantity,
-              unitPrice: line.unitPrice,
-              taxAmount: line.amount,
-              amount: line.amount,
-            })),
+            create: existing.lines.map((line) => {
+              const qty = line.quantity;
+              const unit = Number(line.unitPrice);
+              const taxRate = Number(line.taxRate ?? 0) / 100;
+              const lineTax = qty * unit * taxRate;
+              return {
+                productId: line.productId,
+                taxId: line.taxId ?? undefined,
+                quantity: qty,
+                unitPrice: line.unitPrice,
+                taxAmount: lineTax,
+                amount: line.amount,
+              };
+            }),
           },
         },
         include: {
-          lines: { include: { product: true } },
+          lines: { include: { product: true, tax: true } },
         },
       });
 

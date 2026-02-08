@@ -23,6 +23,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   Plus,
   Trash2,
   Send,
@@ -34,6 +41,8 @@ import {
   Lock,
   Loader2,
   Save,
+  History,
+  CalendarClock,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -124,6 +133,16 @@ interface SubscriptionData {
     totalAmount: number;
     issueDate: string;
   }>;
+  childSubscriptions?: Array<{
+    id: string;
+    subscriptionNo: string;
+    status: string;
+    createdAt: string;
+  }>;
+  paymentTermConfig?: {
+    earlyDiscount?: number;
+    dueTerms?: Array<{ due: string; after: string }>;
+  } | null;
   payments?: Array<{
     id: string;
     method: string;
@@ -140,6 +159,10 @@ interface SubscriptionFormProps {
   onAction: (action: string) => Promise<any>;
   onBack: () => void;
   loading?: boolean;
+  /** When true, hide the Create Invoice button (e.g. when opened from a confirmed invoice) */
+  hideCreateInvoice?: boolean;
+  /** When user clicks a subscription in History, open that subscription */
+  onOpenSubscription?: (subscriptionId: string) => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -190,6 +213,8 @@ export function SubscriptionForm({
   onAction,
   onBack,
   loading = false,
+  hideCreateInvoice = false,
+  onOpenSubscription,
 }: SubscriptionFormProps) {
   const isNew = !subscription?.id;
   const status = subscription?.status || "DRAFT";
@@ -212,6 +237,19 @@ export function SubscriptionForm({
       ? new Date(subscription.createdAt).toISOString().split("T")[0]
       : new Date().toISOString().split("T")[0]
   );
+
+  // Payment term config (Early discount + Due terms table)
+  const [paymentTermConfig, setPaymentTermConfig] = useState<{
+    earlyDiscount?: number;
+    dueTerms?: Array<{ due: string; after: string }>;
+  } | null>(() => {
+    const c = subscription?.paymentTermConfig as { earlyDiscount?: number; dueTerms?: Array<{ due: string; after: string }> } | undefined;
+    if (c && (c.earlyDiscount != null || (c.dueTerms && c.dueTerms.length > 0)))
+      return { earlyDiscount: c.earlyDiscount, dueTerms: c.dueTerms ?? [] };
+    return { earlyDiscount: undefined, dueTerms: [{ due: "100 percent/fixed", after: "days after invoice create" }] };
+  });
+  const [paymentTermOpen, setPaymentTermOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   // Order lines
   const [lines, setLines] = useState<OrderLine[]>(() => {
@@ -505,6 +543,7 @@ export function SubscriptionForm({
       userId: customerId,
       recurringPlanId: recurringPlanId || null,
       paymentTerms,
+      paymentTermConfig: paymentTermConfig ?? undefined,
       lines: lines.map((l) => ({
         productId: l.productId,
         quantity: l.quantity,
@@ -664,17 +703,31 @@ export function SubscriptionForm({
           </>
         )}
 
+        {/* History: show on first (parent) subscription that has renew/upsell children */}
+        {!isNew && (subscription?.childSubscriptions?.length ?? 0) > 0 && (
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => setHistoryOpen(true)}
+          >
+            <History className="h-4 w-4" />
+            History ({(subscription?.childSubscriptions?.length ?? 0)})
+          </Button>
+        )}
+
         {/* Active actions */}
         {status === "ACTIVE" && (
           <>
-            <Button
-              className="gap-2"
-              onClick={() => onAction("create_invoice")}
-              disabled={loading}
-            >
-              <FileText className="h-4 w-4" />
-              Create Invoice
-            </Button>
+            {!hideCreateInvoice && (
+              <Button
+                className="gap-2"
+                onClick={() => onAction("create_invoice")}
+                disabled={loading}
+              >
+                <FileText className="h-4 w-4" />
+                Create Invoice
+              </Button>
+            )}
             <Button
               variant="outline"
               className="gap-2"
@@ -769,23 +822,36 @@ export function SubscriptionForm({
             {/* Payment Terms */}
             <div className="space-y-2">
               <Label>Payment Terms</Label>
-              <Select
-                value={paymentTerms}
-                onValueChange={setPaymentTerms}
-                disabled={isReadOnly}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="IMMEDIATE">Immediate Payment</SelectItem>
-                  <SelectItem value="NET_15">Net 15 Days</SelectItem>
-                  <SelectItem value="NET_30">Net 30 Days</SelectItem>
-                  <SelectItem value="NET_45">Net 45 Days</SelectItem>
-                  <SelectItem value="NET_60">Net 60 Days</SelectItem>
-                  <SelectItem value="DUE_ON_RECEIPT">Due on Receipt</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <Select
+                  value={paymentTerms}
+                  onValueChange={setPaymentTerms}
+                  disabled={isReadOnly}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="IMMEDIATE">Immediate Payment</SelectItem>
+                    <SelectItem value="NET_15">Net 15 Days</SelectItem>
+                    <SelectItem value="NET_30">Net 30 Days</SelectItem>
+                    <SelectItem value="NET_45">Net 45 Days</SelectItem>
+                    <SelectItem value="NET_60">Net 60 Days</SelectItem>
+                    <SelectItem value="DUE_ON_RECEIPT">Due on Receipt</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPaymentTermOpen(true)}
+                  disabled={isReadOnly}
+                  className="shrink-0"
+                >
+                  <CalendarClock className="h-4 w-4" />
+                  Payment term
+                </Button>
+              </div>
             </div>
 
             {/* Expiration */}
@@ -1272,6 +1338,171 @@ export function SubscriptionForm({
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* History dialog — renew/upsell children */}
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Subscription history
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Renewals and upsells from this subscription ({subscription?.childSubscriptions?.length ?? 0} total)
+          </p>
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40">
+                  <TableHead>Subscription</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
+                  {onOpenSubscription && <TableHead className="w-[80px]" />}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(subscription?.childSubscriptions ?? []).map((child: { id: string; subscriptionNo: string; status: string; createdAt: string }) => (
+                  <TableRow key={child.id}>
+                    <TableCell className="font-medium">{child.subscriptionNo}</TableCell>
+                    <TableCell>
+                      <Badge variant={statusColor(child.status) as any}>
+                        {statusLabel(child.status)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {new Date(child.createdAt).toLocaleDateString()}
+                    </TableCell>
+                    {onOpenSubscription && (
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setHistoryOpen(false);
+                            onOpenSubscription(child.id);
+                          }}
+                        >
+                          Open
+                        </Button>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment term popup — Early discount + Due terms */}
+      <Dialog open={paymentTermOpen} onOpenChange={setPaymentTermOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Payment term</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Early discount</Label>
+              <Input
+                type="number"
+                min={0}
+                step={0.01}
+                placeholder="0"
+                value={paymentTermConfig?.earlyDiscount ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setPaymentTermConfig((prev) => ({
+                    ...prev,
+                    earlyDiscount: v === "" ? undefined : Number(v),
+                    dueTerms: prev?.dueTerms ?? [{ due: "100 percent/fixed", after: "days after invoice create" }],
+                  }));
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Due term</Label>
+              <div className="rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/40">
+                      <TableHead>Due</TableHead>
+                      <TableHead>After</TableHead>
+                      {!isReadOnly && <TableHead className="w-[70px]" />}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(paymentTermConfig?.dueTerms ?? []).map((row, i) => (
+                      <TableRow key={i}>
+                        <TableCell>
+                          <Input
+                            className="h-8 border-0 bg-transparent shadow-none"
+                            value={row.due}
+                            onChange={(e) => {
+                              const terms = [...(paymentTermConfig?.dueTerms ?? [])];
+                              terms[i] = { ...terms[i], due: e.target.value };
+                              setPaymentTermConfig((prev) => ({ ...prev, dueTerms: terms }));
+                            }}
+                            placeholder="100 percent/fixed"
+                            disabled={isReadOnly}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            className="h-8 border-0 bg-transparent shadow-none"
+                            value={row.after}
+                            onChange={(e) => {
+                              const terms = [...(paymentTermConfig?.dueTerms ?? [])];
+                              terms[i] = { ...terms[i], after: e.target.value };
+                              setPaymentTermConfig((prev) => ({ ...prev, dueTerms: terms }));
+                            }}
+                            placeholder="days after invoice create"
+                            disabled={isReadOnly}
+                          />
+                        </TableCell>
+                        {!isReadOnly && (
+                          <TableCell>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => {
+                                const terms = (paymentTermConfig?.dueTerms ?? []).filter((_, j) => j !== i);
+                                setPaymentTermConfig((prev) => ({ ...prev, dueTerms: terms.length ? terms : [{ due: "100 percent/fixed", after: "days after invoice create" }] }));
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {!isReadOnly && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => setPaymentTermConfig((prev) => ({
+                    ...prev,
+                    dueTerms: [...(prev?.dueTerms ?? []), { due: "", after: "" }],
+                  }))}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add row
+                </Button>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setPaymentTermOpen(false)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

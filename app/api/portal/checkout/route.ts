@@ -323,14 +323,17 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Optionally create an initial invoice for this subscription
+    // Create initial invoice (same structure as internal create_invoice)
     if (subscription) {
+      const issueDate = new Date();
+      const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
       await prisma.invoice.create({
         data: {
           invoiceNo: `INV-${subscription.subscriptionNo}`,
           subscriptionId: subscription.id,
           status: "DRAFT",
-          issueDate: new Date(),
+          issueDate,
+          dueDate,
           subtotal: computedSubtotal,
           taxAmount: computedTax,
           totalAmount: computedTotal,

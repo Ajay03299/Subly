@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
   Trash2,
@@ -76,6 +77,13 @@ interface Subscription {
     totalAmount: number;
     issueDate: string;
   }>;
+  childSubscriptions?: Array<{
+    id: string;
+    subscriptionNo: string;
+    status: string;
+    createdAt: string;
+  }>;
+  paymentTermConfig?: { earlyDiscount?: number; dueTerms?: Array<{ due: string; after: string }> } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -122,6 +130,8 @@ function statusLabel(status: SubStatus) {
 /* ------------------------------------------------------------------ */
 
 export default function SubscriptionsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const { loading: authLoading } = useProtectedRoute({
     requireAuth: true,
@@ -175,6 +185,15 @@ export default function SubscriptionsPage() {
       fetchSubscriptions();
     }
   }, [authLoading, user, fetchSubscriptions]);
+
+  /* ── Open subscription from URL (e.g. from invoice "Subscription" link) ── */
+  const viewFromUrl = searchParams.get("view");
+  const fromInvoice = searchParams.get("fromInvoice") === "1";
+  useEffect(() => {
+    if (authLoading || !viewFromUrl || !fromInvoice) return;
+    setView(viewFromUrl);
+    fetchSubscription(viewFromUrl);
+  }, [authLoading, viewFromUrl, fromInvoice]);
 
   /* ── Auto-dismiss messages ──────────────────────────── */
   useEffect(() => {
@@ -347,10 +366,10 @@ export default function SubscriptionsPage() {
         setActiveSubscription(data.subscription);
         setView(data.subscription.id);
         setSuccess("Upsell draft created — you can edit it before confirming");
-      } else if (action === "create_invoice") {
-        // Refresh current subscription to show new invoice
-        await fetchSubscription(activeSubscription.id);
-        setSuccess(`Invoice ${data.invoice?.invoiceNo} created`);
+      } else if (action === "create_invoice" && data.invoice?.id) {
+        // Redirect to draft invoice page so user can Confirm / Cancel
+        router.push(`/internal/invoices/${data.invoice.id}`);
+        return;
       }
 
       await fetchSubscriptions();
@@ -551,6 +570,11 @@ export default function SubscriptionsPage() {
                 setActiveSubscription(null);
               }}
               loading={loading}
+              hideCreateInvoice={fromInvoice}
+              onOpenSubscription={(id) => {
+                setView(id);
+                fetchSubscription(id);
+              }}
             />
           </>
         ) : (

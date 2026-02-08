@@ -164,6 +164,7 @@ export async function POST(request: NextRequest) {
         userId,
         recurringPlanId: recurringPlanId || null,
         paymentTerms: paymentTerms || null,
+        endDate: expirationDate ? new Date(expirationDate) : null,
         status: "DRAFT",
         subtotal,
         taxAmount,

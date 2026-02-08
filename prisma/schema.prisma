@@ -233,6 +233,9 @@ model Subscription {
 
   status SubscriptionStatus @default(DRAFT)
 
+  // Renewal window
+  endDate DateTime?
+
   // Discount information
   discountCode   String? // the code applied, if any
   discountAmount Decimal @default(0) @db.Decimal(12, 2) // amount discounted

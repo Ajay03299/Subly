@@ -152,6 +152,15 @@ export async function PATCH(
       }
     }
 
+    if (body.expirationDate !== undefined) {
+      body.endDate = body.expirationDate ? new Date(body.expirationDate) : null;
+      delete body.expirationDate;
+    }
+
+    if (body.endDate !== undefined) {
+      body.endDate = body.endDate ? new Date(body.endDate) : null;
+    }
+
     // Handle adding/updating lines
     if (body.lines) {
       // Delete old lines and recreate

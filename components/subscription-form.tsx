@@ -236,6 +236,19 @@ export function SubscriptionForm({
   const [recurringPlans, setRecurringPlans] = useState<RecurringPlan[]>([]);
   const [taxes, setTaxes] = useState<Tax[]>([]);
 
+  // Quotation templates
+  const [templates, setTemplates] = useState<Array<{
+    id: string;
+    name: string;
+    recurringPlanId?: string | null;
+    lines: Array<{
+      product: { id: string; name: string; salesPrice: number };
+      quantity: number;
+    }>;
+  }>>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [templateMessage, setTemplateMessage] = useState<string | null>(null);
+
   // Plan option filters (for filtering which products show in the dropdown)
   const [filterAutoClose, setFilterAutoClose] = useState(false);
   const [filterCloseable, setFilterCloseable] = useState(false);
@@ -300,11 +313,12 @@ export function SubscriptionForm({
       const token = getToken();
       const headers = { Authorization: `Bearer ${token}` };
 
-      const [usersRes, productsRes, plansRes, taxesRes] = await Promise.all([
+      const [usersRes, productsRes, plansRes, taxesRes, templatesRes] = await Promise.all([
         fetch("/api/admin/users", { headers }),
         fetch("/api/admin/products", { headers }),
         fetch("/api/admin/recurring-plans", { headers }),
         fetch("/api/admin/taxes", { headers }),
+        fetch("/api/admin/quotation-templates", { headers }),
       ]);
 
       if (usersRes.ok) {
@@ -323,6 +337,10 @@ export function SubscriptionForm({
         const data = await taxesRes.json();
         setTaxes(data.taxes || []);
       }
+      if (templatesRes.ok) {
+        const data = await templatesRes.json();
+        setTemplates(data.templates || []);
+      }
     } catch (err) {
       console.error("Failed to fetch dropdown data:", err);
     } finally {
@@ -330,9 +348,79 @@ export function SubscriptionForm({
     }
   }, []);
 
+  /* ── Load from template ─────────────────────────────── */
+  const loadTemplate = useCallback((templateId: string) => {
+    const template = templates.find((t) => t.id === templateId);
+    if (!template) return;
+
+    // Set recurring plan if template has one
+    if (template.recurringPlanId) {
+      setRecurringPlanId(template.recurringPlanId);
+
+      // Find the recurring plan details and populate filter states
+      const selectedPlan = recurringPlans.find(
+        (p) => p.id === template.recurringPlanId
+      );
+      if (selectedPlan) {
+        setFilterAutoClose(selectedPlan.autoClose);
+        setFilterCloseable(selectedPlan.closeable);
+        setFilterRenewable(selectedPlan.renewable);
+        setFilterPausable(selectedPlan.pausable);
+        setFilterPlanId(template.recurringPlanId);
+      }
+    }
+
+    // Load template lines into subscription lines
+    const newLines: OrderLine[] = template.lines.map((line) => {
+      const product = products.find((p) => p.id === line.product.id);
+      if (!product) return null;
+
+      // Find price from recurring plan info if available
+      let unitPrice = Number(product.salesPrice);
+      if (template.recurringPlanId && product.recurringPlanInfos) {
+        const planInfo = product.recurringPlanInfos.find(
+          (info) => info.recurringPlanId === template.recurringPlanId
+        );
+        if (planInfo) {
+          unitPrice = Number(planInfo.price);
+        }
+      }
+
+      // Get default tax rate
+      const defaultTax = taxes.find((t) => t.rate > 0);
+      const taxRate = defaultTax ? Number(defaultTax.rate) : 0;
+
+      const subtotal = unitPrice * line.quantity;
+      const taxAmount = (subtotal * taxRate) / 100;
+      const amount = subtotal + taxAmount;
+
+      return {
+        productId: product.id,
+        productName: product.name,
+        quantity: line.quantity,
+        unitPrice,
+        discount: 0,
+        taxRate,
+        amount,
+      };
+    }).filter((l): l is OrderLine => l !== null);
+
+    setLines(newLines);
+    setSelectedTemplateId("");
+    setTemplateMessage(`Template "${template.name}" applied successfully`);
+  }, [templates, products, taxes, recurringPlans, setFilterAutoClose, setFilterCloseable, setFilterRenewable, setFilterPausable, setFilterPlanId]);
+
   useEffect(() => {
     fetchDropdownData();
   }, [fetchDropdownData]);
+
+  // Auto-dismiss template success message
+  useEffect(() => {
+    if (templateMessage) {
+      const timer = setTimeout(() => setTemplateMessage(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [templateMessage]);
 
   // Set default tax rate when taxes load
   useEffect(() => {
@@ -504,6 +592,39 @@ export function SubscriptionForm({
             )}
             {isNew ? "Create" : "Save"}
           </Button>
+        )}
+
+        {/* Load from Template */}
+        {(isNew || status === "DRAFT") && templates.length > 0 && (
+          <div className="relative">
+            <Select
+              value={selectedTemplateId}
+              onValueChange={(value) => {
+                if (value) {
+                  loadTemplate(value);
+                }
+              }}
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Load Template..." />
+              </SelectTrigger>
+              <SelectContent>
+                {templates.map((template) => (
+                  <SelectItem key={template.id} value={template.id}>
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-3 w-3" />
+                      {template.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {templateMessage && (
+              <div className="absolute left-0 top-full mt-1 rounded-md bg-green-100 px-3 py-2 text-sm text-green-800 shadow-md whitespace-nowrap">
+                ✓ {templateMessage}
+              </div>
+            )}
+          </div>
         )}
 
         {/* Draft actions: Send Quotation & Activate */}

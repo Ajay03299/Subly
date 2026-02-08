@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   ShoppingBag,
   User,
@@ -26,6 +26,7 @@ export function Navbar() {
   const [tagLoading, setTagLoading] = useState(false);
   const { itemCount } = useCart();
   const { user, logout } = useAuth();
+  const accountDropdownRef = useRef<HTMLDivElement>(null);
 
   const getToken = () => localStorage.getItem("accessToken") ?? "";
 
@@ -47,6 +48,25 @@ export function Navbar() {
 
     fetchTags();
   }, [configOpen, user?.role]);
+
+  // Close account dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        accountDropdownRef.current &&
+        !accountDropdownRef.current.contains(event.target as Node)
+      ) {
+        setAccountOpen(false);
+      }
+    };
+
+    if (accountOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+      };
+    }
+  }, [accountOpen]);
 
   const handleAddTag = async () => {
     if (!tagName.trim()) {
@@ -104,74 +124,6 @@ export function Navbar() {
         <div className="flex items-center gap-2">
           <ThemeToggle />
 
-          {user?.role === "ADMIN" && (
-            <div className="relative">
-              <Button
-                variant="ghost"
-                className="flex items-center gap-1.5 text-sm"
-                onClick={() => setConfigOpen(!configOpen)}
-                onBlur={() => setTimeout(() => setConfigOpen(false), 150)}
-              >
-                <span className="hidden sm:inline">Configuration</span>
-                <ChevronDown
-                  className={cn(
-                    "h-3 w-3 transition-transform",
-                    configOpen && "rotate-180"
-                  )}
-                />
-              </Button>
-
-              {configOpen && (
-                <div className="absolute right-0 mt-2 w-72 rounded-lg border border-border bg-popover p-3 shadow-lg">
-                  <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
-                    Product Tags
-                  </div>
-
-                  <div className="flex gap-2">
-                    <input
-                      value={tagName}
-                      onChange={(e) => setTagName(e.target.value)}
-                      placeholder="Add a tag"
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    />
-                    <Button
-                      size="sm"
-                      onClick={handleAddTag}
-                      disabled={tagLoading}
-                    >
-                      Add
-                    </Button>
-                  </div>
-
-                  {tagError && (
-                    <div className="mt-2 text-xs text-destructive">{tagError}</div>
-                  )}
-
-                  <div className="mt-4 border-t border-border pt-3">
-                    <Button
-                      asChild
-                      variant="outline"
-                      size="sm"
-                      className="mb-2 w-full"
-                      onClick={() => setConfigOpen(false)}
-                    >
-                      <Link href="/internal/discounts">Manage Discounts</Link>
-                    </Button>
-                    <Button
-                      asChild
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => setConfigOpen(false)}
-                    >
-                      <Link href="/internal/taxes">Manage Taxes</Link>
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Cart */}
           <Button variant="ghost" size="icon" className="relative h-9 w-9" asChild>
             <Link href="/cart">
@@ -185,12 +137,11 @@ export function Navbar() {
           </Button>
 
           {/* My Account dropdown */}
-          <div className="relative">
+          <div className="relative" ref={accountDropdownRef}>
             <Button
               variant="ghost"
               className="flex items-center gap-1.5 text-sm"
               onClick={() => setAccountOpen(!accountOpen)}
-              onBlur={() => setTimeout(() => setAccountOpen(false), 150)}
             >
               <User className="h-4 w-4" />
               <span className="hidden sm:inline">My Account</span>
@@ -207,6 +158,7 @@ export function Navbar() {
                 <Link
                   href="/profile"
                   className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-popover-foreground transition-colors hover:bg-accent"
+                  onClick={() => setAccountOpen(false)}
                 >
                   <UserCircle className="h-4 w-4" />
                   My Profile
@@ -214,13 +166,17 @@ export function Navbar() {
                 <Link
                   href="/orders"
                   className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-popover-foreground transition-colors hover:bg-accent"
+                  onClick={() => setAccountOpen(false)}
                 >
                   <ClipboardList className="h-4 w-4" />
                   My Orders
                 </Link>
                 <hr className="my-1 border-border" />
                 <button
-                  onClick={() => logout()}
+                  onClick={() => {
+                    logout();
+                    setAccountOpen(false);
+                  }}
                   className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10"
                 >
                   <LogOut className="h-4 w-4" />

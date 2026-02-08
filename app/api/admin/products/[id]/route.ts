@@ -50,6 +50,9 @@ export async function GET(
             recurringPlan: true,
           },
         },
+        tag: true,
+        tax: true,
+        images: true,
       },
     });
 
@@ -86,39 +89,79 @@ export async function PUT(
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    const { name, type, salesPrice, costPrice, recurringPlanInfos } =
-      await request.json();
+    const requestBody = await request.json();
+    
+    // Handle both nested and flat data structures
+    const productData = requestBody.product || requestBody;
+    const variants = requestBody.variants || [];
+    const recurringPlanInfos = requestBody.recurringPlanInfos || [];
 
-    // If updating recurring plan infos, delete old ones and create new ones
-    if (recurringPlanInfos !== undefined) {
-      await prisma.recurringPlanInfo.deleteMany({
-        where: { productId: id },
-      });
+    const {
+      name,
+      type,
+      salesPrice,
+      costPrice,
+      description,
+      tagId,
+      taxId,
+      images,
+    } = productData;
+
+    // Validate required fields
+    if (!name || !type || salesPrice === undefined || costPrice === undefined) {
+      return NextResponse.json(
+        { error: "Missing required fields: name, type, salesPrice, costPrice" },
+        { status: 400 }
+      );
     }
+
+    // Validate prices
+    const sales = parseFloat(salesPrice);
+    const cost = parseFloat(costPrice);
+
+    if (isNaN(sales) || isNaN(cost)) {
+      return NextResponse.json(
+        { error: "Sales price and cost price must be valid numbers" },
+        { status: 400 }
+      );
+    }
+
+    // Delete old relations and create new ones
+    await prisma.recurringPlanInfo.deleteMany({ where: { productId: id } });
+    await prisma.variant.deleteMany({ where: { productId: id } });
+    await prisma.productImage.deleteMany({ where: { productId: id } });
 
     const product = await prisma.product.update({
       where: { id },
       data: {
-        ...(name !== undefined && { name }),
-        ...(type !== undefined && { type }),
-        ...(salesPrice !== undefined && {
-          salesPrice: parseFloat(salesPrice),
-        }),
-        ...(costPrice !== undefined && {
-          costPrice: parseFloat(costPrice),
-        }),
-        ...(recurringPlanInfos !== undefined && {
-          recurringPlanInfos: {
-            create: Array.isArray(recurringPlanInfos)
-              ? recurringPlanInfos.map((info: any) => ({
-                  recurringPlanId: info.recurringPlanId,
-                  price: parseFloat(info.price),
-                  startDate: new Date(info.startDate),
-                  endDate: info.endDate ? new Date(info.endDate) : null,
-                }))
-              : [],
-          },
-        }),
+        name,
+        type,
+        salesPrice: sales,
+        costPrice: cost,
+        description: description || null,
+        tagId: tagId || null,
+        taxId: taxId || null,
+        images: {
+          create: images && Array.isArray(images) ? images.map((img: any) => ({
+            url: img.url,
+            alt: img.alt || null,
+          })) : [],
+        },
+        variants: {
+          create: variants && Array.isArray(variants) ? variants.map((v: any) => ({
+            attribute: v.attribute,
+            value: v.value,
+            extraPrice: parseFloat(v.extraPrice || 0),
+          })) : [],
+        },
+        recurringPlanInfos: {
+          create: recurringPlanInfos && Array.isArray(recurringPlanInfos) ? recurringPlanInfos.map((info: any) => ({
+            recurringPlanId: info.recurringPlanId,
+            price: parseFloat(info.price),
+            startDate: new Date(info.startDate),
+            endDate: info.endDate ? new Date(info.endDate) : null,
+          })) : [],
+        },
       },
       include: {
         variants: true,
@@ -127,6 +170,9 @@ export async function PUT(
             recurringPlan: true,
           },
         },
+        tag: true,
+        tax: true,
+        images: true,
       },
     });
 

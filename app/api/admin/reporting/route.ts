@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: "desc" },
         include: {
           user: { select: { email: true } },
-          recurringPlan: { select: { billingPeriod: true } },
+          recurringPlan: { select: { price: true, billingPeriod: true } },
         },
       }),
 
@@ -297,7 +297,7 @@ export async function GET(request: NextRequest) {
           customer: s.user.email,
           status: s.status,
           totalAmount: Number(s.totalAmount),
-          plan: s.recurringPlan ? s.recurringPlan.billingPeriod : "—",
+          plan: s.recurringPlan ? `₹${Number(s.recurringPlan.price)}/${s.recurringPlan.billingPeriod.toLowerCase()}` : "—",
           billingPeriod: s.recurringPlan?.billingPeriod || "—",
           createdAt: s.createdAt,
         })),

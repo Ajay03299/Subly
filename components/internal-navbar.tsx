@@ -221,13 +221,16 @@ export function InternalNavbar() {
 
               {configOpen && (
                 <div className="absolute left-0 mt-2 w-72 rounded-lg border border-border bg-popover p-3 shadow-lg">
-                  <Button asChild variant="outline" size="sm" className="mb-3 w-full" onClick={() => setConfigOpen(false)}>
-                    <Link href="/internal/configuration/attributes">Manage Attributes</Link>
-                  </Button>
-                  <Button asChild variant="outline" size="sm" className="mb-3 w-full" onClick={() => setConfigOpen(false)}>
+                  <Button asChild variant="outline" size="sm" className="mb-2 w-full" onClick={() => setConfigOpen(false)}>
                     <Link href="/internal/configuration">Manage Product Tags</Link>
                   </Button>
-                  <Button asChild variant="outline" size="sm" className="mb-3 w-full" onClick={() => setConfigOpen(false)}>
+                  <Button asChild variant="outline" size="sm" className="mb-2 w-full" onClick={() => setConfigOpen(false)}>
+                    <Link href="/internal/configuration/recurring-plans">Recurring Plans</Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm" className="mb-2 w-full" onClick={() => setConfigOpen(false)}>
+                    <Link href="/internal/configuration/quotation-templates">Quotation Templates</Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm" className="mb-2 w-full" onClick={() => setConfigOpen(false)}>
                     <Link href="/internal/discounts">Manage Discounts</Link>
                   </Button>
                   <Button asChild variant="outline" size="sm" className="w-full" onClick={() => setConfigOpen(false)}>
